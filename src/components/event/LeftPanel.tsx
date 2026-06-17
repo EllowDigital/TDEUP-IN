@@ -7,7 +7,7 @@ export function LeftPanel() {
       <div>
         <div className="mb-8">
         <Image
-            src="/logo-banner.jpeg"
+            src="/logo-banner.png"
             alt="Tent Decor Expo"
             width={300}
             height={80}

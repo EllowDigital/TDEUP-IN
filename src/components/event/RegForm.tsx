@@ -68,7 +68,8 @@ const INDIAN_STATES = [
 ];
 
 interface RegFormProps {
-  onSuccess: (data: FormValues) => void | Promise<void>;
+  // Now it expects BOTH the data and the newly generated ID
+  onSuccess: (data: FormValues, attendeeId: string) => void | Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,15 +221,53 @@ export function RegForm({ onSuccess }: RegFormProps) {
     []
   );
 
-  const onSubmit = async (data: FormValues) => {
-    await onSuccess({ ...data, photo: compressedPhoto });
-  };
+const onSubmit = async (data: FormValues) => {
+  try {
+    const formData = new FormData();
+    
+    // Append all text fields
+    Object.entries(data).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value)); // Handle the days array
+      } else if (value) {
+        formData.append(key, value as string);
+      }
+    });
+
+    // Append the compressed photo if it exists
+    if (compressedPhoto) {
+      formData.append("photo", compressedPhoto);
+    }
+
+    // Send to your Vercel backend
+    const response = await fetch("/api/register", {
+      method: "POST",
+      body: formData,
+    });
+
+    // Read the JSON response FIRST so we can see any custom error messages
+    const result = await response.json();
+    
+    if (!response.ok) {
+      // This alerts the user if their mobile number is a duplicate!
+      alert(result.message || "Registration failed. Please try again.");
+      return; 
+    }
+
+    // Trigger your success callback, passing BOTH the data and the new UID
+    await onSuccess({ ...data, photo: compressedPhoto }, result.attendeeId);
+
+  } catch (error) {
+    console.error("Submission failed:", error);
+    alert("Network error. Please check your connection and try again.");
+  }
+};
 
   const showOrgSection = ["BUSINESS", "EXHIBITOR", "MEDIA"].includes(watchAttendeeType);
   const isBusy = form.formState.isSubmitting || isProcessingPhoto;
 
   return (
-    <div className="max-w-2xl mx-auto w-full">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Help Banner */}
       <div className="bg-blue-50 border border-blue-100 text-blue-800 p-4 rounded-xl text-sm mb-8 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -244,13 +283,13 @@ export function RegForm({ onSuccess }: RegFormProps) {
         </Button>
       </div>
 
-      <div className="mb-8">
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-2 tracking-tight">
+      <div className="mb-8 sm:mb-10 text-center">
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900">
           Visitor Registration
         </h2>
-        <p className="text-slate-500">
-          Please provide your details below to secure your E-Pass. <br className="hidden sm:block" />
-          (अपना ई-पास प्राप्त करने के लिए कृपया नीचे अपना विवरण भरें।)
+
+        <p className="mt-3 text-slate-500 max-w-2xl mx-auto">
+          Complete your registration and instantly receive your digital E-Pass.
         </p>
       </div>
 
@@ -261,7 +300,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
           onClick={() => fileInputRef.current?.click()}
           aria-label="Upload profile photo / प्रोफ़ाइल फ़ोटो अपलोड करें"
           disabled={isProcessingPhoto}
-          className="relative w-40 h-40 cursor-pointer group appearance-none bg-transparent border-0 p-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-wait"
+          className="relative w-32 h-32 sm:w-40 sm:h-40 lg:w-44 lg:h-44 cursor-pointer group appearance-none bg-transparent border-0 p-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-wait"
         >
           {photoPreview ? (
             <img
@@ -274,7 +313,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
               <User className="w-12 h-12 text-slate-400" />
               <span className="text-xs font-semibold mt-2">Upload Photo</span>
               <span className="text-[10px] text-slate-500">JPG • PNG • WEBP</span>
-              <span className="text-[10px] text-slate-500">Max 10MB (Auto Compressed)</span>
+              <span className="text-[10px] text-slate-500">Max 10MB</span>
             </div>
           )}
 
@@ -306,7 +345,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
       <Form {...form}>
         <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           {/* SECTION 1: Personal Details */}
-          <div className="space-y-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="space-y-5 bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 lg:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-2">
               <User className="w-5 h-5 text-blue-600" />
               <h3 className="text-lg font-semibold text-slate-800">
@@ -402,7 +441,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
           </div>
 
           {/* SECTION 2: Visitor Profile */}
-          <div className="space-y-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="space-y-5 bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 lg:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-2">
               <Briefcase className="w-5 h-5 text-amber-500" />
               <h3 className="text-lg font-semibold text-slate-800">
@@ -691,7 +730,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
           <Button
             type="submit"
             disabled={isBusy}
-            className="w-full h-14 bg-[#F5B415] hover:bg-[#dca113] disabled:opacity-70 disabled:hover:bg-[#F5B415] text-black font-bold text-lg md:text-xl rounded-xl shadow-lg transition-all hover:scale-[1.01] disabled:scale-100 flex items-center justify-center gap-2"
+            className="w-full h-16 rounded-2xl bg-[#F5B415] hover:bg-[#D9A012] text-black font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300
+"
           >
             {form.formState.isSubmitting ? (
               <>

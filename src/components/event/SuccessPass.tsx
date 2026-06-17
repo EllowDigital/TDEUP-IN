@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { Download, User, MapPin } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -21,6 +21,18 @@ interface SuccessPassProps {
 
 export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassProps) {
   const passRef = useRef<HTMLDivElement>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  // Instantly create a local preview of the uploaded photo
+  useEffect(() => {
+    // @ts-ignore - photo is dynamically added to the FormValues object
+    const file = attendeeData.photo;
+    if (file instanceof File) {
+      const url = URL.createObjectURL(file);
+      setPhotoUrl(url);
+      return () => URL.revokeObjectURL(url); // Cleanup memory
+    }
+  }, [attendeeData]);
 
   const downloadPass = async () => {
     if (!passRef.current) return;
@@ -127,10 +139,18 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
           </p>
         </div>
 
-        {/* Overlapping Profile Picture - Positioned to prevent text collision */}
+        {/* Overlapping Profile Picture */}
         <div className="absolute top-[95px] left-1/2 -translate-x-1/2 z-10">
-          <div className="w-[90px] h-[90px] bg-[#EEF2F6] rounded-full border-[4px] border-white flex items-center justify-center overflow-hidden">
-            <User className="text-[#8B9DB1] w-10 h-10 mt-1" strokeWidth={1.5} />
+          <div className="w-[90px] h-[90px] bg-[#EEF2F6] rounded-full border-[4px] border-white flex items-center justify-center overflow-hidden shadow-sm">
+            {photoUrl ? (
+              <img 
+                src={photoUrl} 
+                alt="Attendee" 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <User className="text-[#8B9DB1] w-10 h-10 mt-1" strokeWidth={1.5} />
+            )}
           </div>
         </div>
 
