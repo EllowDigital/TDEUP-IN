@@ -58,12 +58,38 @@ const BUSINESS_CATEGORIES = [
 ] as const;
 
 const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Andaman and Nicobar Islands", "Chandigarh", "Delhi", "Jammu and Kashmir",
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Delhi",
+  "Jammu and Kashmir",
   "Ladakh",
 ];
 
@@ -180,92 +206,88 @@ export function RegForm({ onSuccess }: RegFormProps) {
     };
   }, [photoPreview]);
 
-  const handlePhotoUpload = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      // Reset the input so choosing the same file again still fires onChange.
-      event.target.value = "";
+  const handlePhotoUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset the input so choosing the same file again still fires onChange.
+    event.target.value = "";
 
-      if (!file) return;
+    if (!file) return;
 
-      setPhotoError("");
+    setPhotoError("");
 
-      if (!file.type.startsWith("image/")) {
-        setPhotoError("Please choose an image file / कृपया एक इमेज फ़ाइल चुनें");
-        return;
-      }
-
-      if (file.size > MAX_UPLOAD_SIZE) {
-        setPhotoError("Maximum allowed image size is 10MB / अधिकतम आकार 10MB है");
-        return;
-      }
-
-      setIsProcessingPhoto(true);
-
-      try {
-        const compressed = await compressImage(file);
-        setCompressedPhoto(compressed);
-        setPhotoPreview((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return URL.createObjectURL(compressed);
-        });
-      } catch (error) {
-        console.error(error);
-        setPhotoError(
-          "Couldn't process this image. Please try another photo / फ़ोटो प्रोसेस नहीं हो सकी"
-        );
-      } finally {
-        setIsProcessingPhoto(false);
-      }
-    },
-    []
-  );
-
-const onSubmit = async (data: FormValues) => {
-  try {
-    const formData = new FormData();
-    
-    // Append all text fields
-    Object.entries(data).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        formData.append(key, JSON.stringify(value)); // Handle the days array
-      } else if (value) {
-        formData.append(key, value as string);
-      }
-    });
-
-    // Append the compressed photo if it exists
-    if (compressedPhoto) {
-      formData.append("photo", compressedPhoto);
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Please choose an image file / कृपया एक इमेज फ़ाइल चुनें");
+      return;
     }
 
-    // Send to your Vercel backend
-    const response = await fetch("/api/register", {
-      method: "POST",
-      body: formData,
-    });
-
-    // Read the JSON response FIRST so we can see any custom error messages
-    const result = await response.json();
-    
-    if (!response.ok) {
-      // This alerts the user if their mobile number is a duplicate!
-      alert(result.message || "Registration failed. Please try again.");
-      return; 
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setPhotoError("Maximum allowed image size is 10MB / अधिकतम आकार 10MB है");
+      return;
     }
-    // --- ADD THESE 3 LINES TO CLEAR THE FORM ---
-    form.reset(); // Clears all text fields
-    setPhotoPreview(""); // Clears the profile picture
-    setCompressedPhoto(null); // Clears the file data
-    // -------------------------------------------
-    // Trigger your success callback, passing BOTH the data and the new UID
-    await onSuccess({ ...data, photo: compressedPhoto }, result.attendeeId);
 
-  } catch (error) {
-    console.error("Submission failed:", error);
-    alert("Network error. Please check your connection and try again.");
-  }
-};
+    setIsProcessingPhoto(true);
+
+    try {
+      const compressed = await compressImage(file);
+      setCompressedPhoto(compressed);
+      setPhotoPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(compressed);
+      });
+    } catch (error) {
+      console.error(error);
+      setPhotoError(
+        "Couldn't process this image. Please try another photo / फ़ोटो प्रोसेस नहीं हो सकी"
+      );
+    } finally {
+      setIsProcessingPhoto(false);
+    }
+  }, []);
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      const formData = new FormData();
+
+      // Append all text fields
+      Object.entries(data).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          formData.append(key, JSON.stringify(value)); // Handle the days array
+        } else if (value) {
+          formData.append(key, value as string);
+        }
+      });
+
+      // Append the compressed photo if it exists
+      if (compressedPhoto) {
+        formData.append("photo", compressedPhoto);
+      }
+
+      // Send to your Vercel backend
+      const response = await fetch("/api/register", {
+        method: "POST",
+        body: formData,
+      });
+
+      // Read the JSON response FIRST so we can see any custom error messages
+      const result = await response.json();
+
+      if (!response.ok) {
+        // This alerts the user if their mobile number is a duplicate!
+        alert(result.message || "Registration failed. Please try again.");
+        return;
+      }
+      // --- ADD THESE 3 LINES TO CLEAR THE FORM ---
+      form.reset(); // Clears all text fields
+      setPhotoPreview(""); // Clears the profile picture
+      setCompressedPhoto(null); // Clears the file data
+      // -------------------------------------------
+      // Trigger your success callback, passing BOTH the data and the new UID
+      await onSuccess({ ...data, photo: compressedPhoto }, result.attendeeId);
+    } catch (error) {
+      console.error("Submission failed:", error);
+      alert("Network error. Please check your connection and try again.");
+    }
+  };
 
   const showOrgSection = ["BUSINESS", "EXHIBITOR", "MEDIA"].includes(watchAttendeeType);
   const isBusy = form.formState.isSubmitting || isProcessingPhoto;
@@ -460,7 +482,7 @@ const onSubmit = async (data: FormValues) => {
                 <FormItem>
                   <FormLabel className="text-slate-700">Visitor Type / दर्शक का प्रकार *</FormLabel>
                   <Select
-                    onValueChange={(val) => {
+                    onValueChange={(val: string) => {
                       field.onChange(val);
                       // Dynamic clearing and smart setting based on type
                       if (val === "MEDIA") {
@@ -511,7 +533,9 @@ const onSubmit = async (data: FormValues) => {
                         <FormControl>
                           <Input
                             className="h-11 bg-amber-50/50 border-amber-200 focus-visible:ring-amber-500"
-                            placeholder={watchAttendeeType === "MEDIA" ? "News Network..." : "Company Ltd."}
+                            placeholder={
+                              watchAttendeeType === "MEDIA" ? "News Network..." : "Company Ltd."
+                            }
                             {...field}
                           />
                         </FormControl>
@@ -526,7 +550,9 @@ const onSubmit = async (data: FormValues) => {
                       name="businessCategory"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-700">Business Category / श्रेणी *</FormLabel>
+                          <FormLabel className="text-slate-700">
+                            Business Category / श्रेणी *
+                          </FormLabel>
                           <Select
                             onValueChange={(val) => {
                               field.onChange(val);
@@ -696,25 +722,29 @@ const onSubmit = async (data: FormValues) => {
                           return (
                             <FormItem className="flex-1 m-0">
                               <FormLabel
-                                className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all w-full ${isChecked
-                                  ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md scale-[1.02]"
-                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                                  }`}
+                                className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all w-full ${
+                                  isChecked
+                                    ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md scale-[1.02]"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                                }`}
                               >
                                 <FormControl className="hidden">
                                   <Checkbox
                                     checked={isChecked}
-                                    onCheckedChange={(checked) =>
+                                    onCheckedChange={(checked: boolean) =>
                                       checked
                                         ? field.onChange([...(field.value ?? []), item.id])
-                                        : field.onChange(field.value?.filter((val) => val !== item.id))
+                                        : field.onChange(
+                                            field.value?.filter((val) => val !== item.id)
+                                          )
                                     }
                                   />
                                 </FormControl>
                                 <span className="font-bold text-base">{item.title}</span>
                                 <span
-                                  className={`text-xs mt-1 font-medium ${isChecked ? "text-slate-300" : "text-slate-400"
-                                    }`}
+                                  className={`text-xs mt-1 font-medium ${
+                                    isChecked ? "text-slate-300" : "text-slate-400"
+                                  }`}
                                 >
                                   {item.date}
                                 </span>

@@ -6,7 +6,7 @@ export function LeftPanel() {
     <div className="w-full lg:w-[40%] bg-[#0B1B2B] text-white p-8 md:p-12 flex flex-col justify-between">
       <div>
         <div className="mb-8">
-        <Image
+          <Image
             src="/logo-banner.png"
             alt="Tent Decor Expo"
             width={300}
@@ -18,7 +18,8 @@ export function LeftPanel() {
             TENT DECOR EXPO UP <br /> 2026
           </h1>
           <p className="text-blue-100 text-sm md:text-base leading-relaxed">
-            Join industry leaders and innovators at the premier expo for tents, decorators, caterers, and event management.
+            Join industry leaders and innovators at the premier expo for tents, decorators,
+            caterers, and event management.
           </p>
         </div>
 
@@ -36,14 +37,22 @@ export function LeftPanel() {
             <MapPin className="text-amber-400 w-6 h-6 mt-1 flex-shrink-0" />
             <div>
               <h3 className="font-bold text-lg">Venue</h3>
-              <p className="text-blue-200">Sanskar Lawn,<br />Kidwai Nagar, Kanpur</p>
+              <p className="text-blue-200">
+                Sanskar Lawn,
+                <br />
+                Kidwai Nagar, Kanpur
+              </p>
             </div>
           </div>
           <div className="flex items-start gap-4">
             <Phone className="text-amber-400 w-6 h-6 mt-1 flex-shrink-0" />
             <div>
               <h3 className="font-bold text-lg">Enquiries</h3>
-              <p className="text-blue-200">7905881922<br />9953903330</p>
+              <p className="text-blue-200">
+                7905881922
+                <br />
+                9953903330
+              </p>
             </div>
           </div>
         </div>

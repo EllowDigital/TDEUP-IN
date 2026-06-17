@@ -28,7 +28,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-100 md:p-6 lg:p-8 flex items-center justify-center">
       <div className="w-full max-w-6xl bg-white shadow-2xl md:rounded-2xl flex flex-col lg:flex-row overflow-hidden min-h-[90vh]">
-        
         {/* Left Branding Panel */}
         <LeftPanel />
 
@@ -37,14 +36,13 @@ export default function Home() {
           {!isRegistered || !attendeeData ? (
             <RegForm onSuccess={handleRegistrationSuccess} />
           ) : (
-            <SuccessPass 
-              attendeeData={attendeeData} 
+            <SuccessPass
+              attendeeData={attendeeData}
               attendeeId={attendeeId} // Pass the real ID to the E-Pass
-              onReset={resetForm} 
+              onReset={resetForm}
             />
           )}
         </div>
-        
       </div>
     </div>
   );

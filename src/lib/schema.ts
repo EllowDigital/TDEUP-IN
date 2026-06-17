@@ -17,12 +17,7 @@ export const formSchema = z
       .string()
       .trim()
       .regex(MOBILE_PATTERN, "Enter valid mobile number / वैध मोबाइल नंबर आवश्यक है"),
-    email: z
-      .string()
-      .trim()
-      .email("Invalid email / अमान्य ईमेल")
-      .optional()
-      .or(z.literal("")),
+    email: z.string().trim().email("Invalid email / अमान्य ईमेल").optional().or(z.literal("")),
     gender: z.enum(["MALE", "FEMALE", "OTHER"]),
     // Removed Sponsor, Speaker, VIP, Organizer as requested
     attendeeType: z.enum(["BUSINESS", "GENERAL", "MEDIA", "EXHIBITOR"]),
@@ -32,13 +27,8 @@ export const formSchema = z
     address: z.string().trim().min(5, "Address is required / पता आवश्यक है"),
     state: z.string().trim().min(2, "State is required / राज्य आवश्यक है"),
     city: z.string().trim().min(2, "City is required / शहर आवश्यक है"),
-    pincode: z
-      .string()
-      .trim()
-      .regex(PINCODE_PATTERN, "Enter valid pincode / पिनकोड आवश्यक है"),
-    attendance: z
-      .array(z.string())
-      .min(1, "Select at least one day / कम से कम एक दिन चुनें"),
+    pincode: z.string().trim().regex(PINCODE_PATTERN, "Enter valid pincode / पिनकोड आवश्यक है"),
+    attendance: z.array(z.string()).min(1, "Select at least one day / कम से कम एक दिन चुनें"),
   })
   .superRefine((data, ctx) => {
     // Business, Exhibitor, and Media all require a "Name"

@@ -28,11 +28,11 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   const passRef = useRef<HTMLDivElement>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
-// Instantly create a local preview of the uploaded photo as Base64
+  // Instantly create a local preview of the uploaded photo as Base64
   useEffect(() => {
     // @ts-ignore - photo is dynamically added to the FormValues object
     const file = attendeeData.photo;
-    
+
     if (file instanceof File) {
       // Convert file to Base64 string instead of a Blob URL
       const reader = new FileReader();
@@ -42,7 +42,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
       reader.readAsDataURL(file);
     } else if (typeof file === "string") {
       // Fallback if it's already a regular URL
-      setPhotoUrl(file);
+      setTimeout(() => setPhotoUrl(file), 0);
     }
   }, [attendeeData]);
 
@@ -52,7 +52,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
     try {
       // 1. Wait for custom fonts to load
       await document.fonts.ready;
-      
+
       // 2. Wait 300ms to ensure the React DOM and profile image have fully painted on screen
       await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -60,7 +60,6 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         cacheBust: true,
         pixelRatio: 3,
         backgroundColor: "#ffffff",
-        useCORS: true,
         // Force the element to ignore any weird parent scaling during export
         style: {
           transform: "scale(1)",
@@ -83,19 +82,23 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   // --- DYNAMIC PASS THEME COLORS ---
   const getTheme = () => {
     switch (attendeeData.attendeeType) {
-      case "BUSINESS": return { bg: "bg-[#F5B415]", text: "text-[#D97706]", label: "BUSINESS PASS" };
-      case "EXHIBITOR": return { bg: "bg-[#006a47]", text: "text-[#00593d]", label: "EXHIBITOR PASS" };
-      case "MEDIA": return { bg: "bg-[#ff0000]", text: "text-[#ff0000ff]", label: "MEDIA PASS" };
-      case "GENERAL": return { bg: "bg-[#0062ff]", text: "text-[#0051ff]", label: "GENERAL PASS" };
-      default: return { bg: "bg-[#F5B415]", text: "text-[#D97706]", label: "ATTENDEE PASS" };
+      case "BUSINESS":
+        return { bg: "bg-[#F5B415]", text: "text-[#D97706]", label: "BUSINESS PASS" };
+      case "EXHIBITOR":
+        return { bg: "bg-[#006a47]", text: "text-[#00593d]", label: "EXHIBITOR PASS" };
+      case "MEDIA":
+        return { bg: "bg-[#ff0000]", text: "text-[#ff0000ff]", label: "MEDIA PASS" };
+      case "GENERAL":
+        return { bg: "bg-[#0062ff]", text: "text-[#0051ff]", label: "GENERAL PASS" };
+      default:
+        return { bg: "bg-[#F5B415]", text: "text-[#D97706]", label: "ATTENDEE PASS" };
     }
   };
   const theme = getTheme();
 
   // --- SMART ATTENDANCE DAYS LOGIC ---
-  const displayDays = attendeeData.attendance.length === 3
-    ? "All Days"
-    : attendeeData.attendance.join(", ");
+  const displayDays =
+    attendeeData.attendance.length === 3 ? "All Days" : attendeeData.attendance.join(", ");
 
   // --- DYNAMIC QR CODE PAYLOAD ---
 
@@ -123,7 +126,6 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
 
   return (
     <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
-
       {/* --- STRICT E-PASS LAYOUT FOR PNG DOWNLOAD --- */}
       {/* This is the container attached to `passRef`. 
         Everything inside here gets downloaded. Everything outside (like buttons) is ignored. 
@@ -160,11 +162,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         <div className="absolute top-[95px] left-1/2 -translate-x-1/2 z-10">
           <div className="w-[90px] h-[90px] bg-[#EEF2F6] rounded-full border-[4px] border-white flex items-center justify-center overflow-hidden shadow-sm">
             {photoUrl ? (
-              <img 
-                src={photoUrl} 
-                alt="Attendee" 
-                className="w-full h-full object-cover" 
-              />
+              <img src={photoUrl} alt="Attendee" className="w-full h-full object-cover" />
             ) : (
               <User className="text-[#8B9DB1] w-10 h-10 mt-1" strokeWidth={1.5} />
             )}
@@ -173,7 +171,6 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
 
         {/* Main Body Area */}
         <div className="px-6 pt-[55px] pb-4 flex flex-col items-center w-full">
-
           {/* Identity & Status Section */}
           <div className="text-center w-full">
             <h3 className="font-serif font-bold text-[24px] text-[#000000] uppercase tracking-wide line-clamp-1">
@@ -192,18 +189,17 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
 
           {/* Core Info Grid: QR Code (Left) & Access Info (Right) */}
           <div className="flex flex-row w-full mt-4 mb-2 items-center border-y border-slate-100 py-3">
-
             {/* Left Column: Fast-Scan QR Code */}
             <div className="w-[45%] flex flex-col items-center justify-center border-r border-slate-200 pr-3">
-             <div className="p-3 bg-white border-2 border-slate-200 rounded-xl">
+              <div className="p-3 bg-white border-2 border-slate-200 rounded-xl">
                 <QRCodeCanvas
                   value={qrPayload}
-                  size={440}        {/* 1. Make the internal image 4x larger for HD quality */}
-                  level="H"         {/* 2. Change from "M" to "H" (High Error Correction) for fast scanning */}
+                  size={440} // 1. Make the internal image 4x larger for HD quality
+                  level="H" // 2. Change from "M" to "H" (High Error Correction) for fast scanning
                   includeMargin={true}
                   bgColor="#FFFFFF"
                   fgColor="#000000"
-                  style={{ width: "110px", height: "110px" }} {/* 3. Shrink it visually using CSS */}
+                  style={{ width: "110px", height: "110px" }} // 3. Shrink it visually using CSS
                 />
               </div>
               <p className="text-[8px] text-slate-600 mt-2 font-bold tracking-widest uppercase">
@@ -217,9 +213,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
                 <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mb-0.5">
                   Attendee ID
                 </p>
-                <p className="text-[17px] font-bold text-slate-800 font-mono">
-                  {attendeeId}
-                </p>
+                <p className="text-[17px] font-bold text-slate-800 font-mono">{attendeeId}</p>
               </div>
               <div>
                 <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mb-0.5">
@@ -253,10 +247,17 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         they will not be included in the downloaded PNG. 
       */}
       <div className="flex flex-col gap-3 w-[350px]">
-        <Button onClick={downloadPass} className="w-full bg-[#0B1B2B] hover:bg-[#15304B] py-6 text-[15px] font-semibold rounded-xl transition-all shadow-md hover:shadow-lg">
+        <Button
+          onClick={downloadPass}
+          className="w-full bg-[#0B1B2B] hover:bg-[#15304B] py-6 text-[15px] font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
+        >
           <Download className="w-5 h-5 mr-2" /> Download E-Pass
         </Button>
-        <Button onClick={onReset} variant="outline" className="w-full border-slate-400 text-slate-900 font-medium py-6 rounded-xl hover:bg-slate-50 transition-all">
+        <Button
+          onClick={onReset}
+          variant="outline"
+          className="w-full border-slate-400 text-slate-900 font-medium py-6 rounded-xl hover:bg-slate-50 transition-all"
+        >
           Register Another Person
         </Button>
       </div>

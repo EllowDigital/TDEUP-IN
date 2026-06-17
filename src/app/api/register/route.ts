@@ -39,7 +39,7 @@ async function getExistingPhotoUrl(mobile: string): Promise<string | null> {
     const result = await cloudinary.api.resource(publicId);
     return result.secure_url;
   } catch (error) {
-    return null; 
+    return null;
   }
 }
 
@@ -49,11 +49,11 @@ async function uploadToCloudinary(buffer: Buffer, mobile: string, retries = 2): 
     try {
       return await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
-          { 
-            folder: "TDEUP_Visitors", 
-            public_id: mobile, 
+          {
+            folder: "TDEUP_Visitors",
+            public_id: mobile,
             overwrite: true,
-            timeout: 20000 
+            timeout: 20000,
           },
           (error, result) => {
             if (result) resolve(result.secure_url);
@@ -76,7 +76,10 @@ export async function POST(req: Request) {
     const mobile = formData.get("mobile") as string;
 
     if (!mobile) {
-      return NextResponse.json({ success: false, message: "Mobile number is required." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Mobile number is required." },
+        { status: 400 }
+      );
     }
 
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -87,7 +90,7 @@ export async function POST(req: Request) {
     // Note the ranges: Column C is Mobile, Column A is UID
     const sheetsPromise = sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["Sheet1!C:C", "Sheet1!A:A"], 
+      ranges: ["Sheet1!C:C", "Sheet1!A:A"],
     });
     const photoPromise = getExistingPhotoUrl(mobile);
 
@@ -101,22 +104,22 @@ export async function POST(req: Request) {
     if (existingMobiles.includes(mobile.trim())) {
       return NextResponse.json(
         { success: false, message: "User with this mobile number is already registered." },
-        { status: 409 } 
+        { status: 409 }
       );
     }
 
     // ---------------------------------------------------------
     // 2. Generate Guaranteed Unique UID
     // ---------------------------------------------------------
-    const attendeeType = formData.get("attendeeType") as string || "GENERAL";
-    const typeInitial = attendeeType.charAt(0).toUpperCase(); 
+    const attendeeType = (formData.get("attendeeType") as string) || "GENERAL";
+    const typeInitial = attendeeType.charAt(0).toUpperCase();
 
     let uid;
     let safetyCounter = 0;
     do {
       uid = `TDE26-${typeInitial}-${generateCode(6)}`;
       safetyCounter++;
-      if (safetyCounter > 10) throw new Error("Could not generate a unique UID"); 
+      if (safetyCounter > 10) throw new Error("Could not generate a unique UID");
     } while (existingUids.includes(uid));
 
     // ---------------------------------------------------------
@@ -142,7 +145,8 @@ export async function POST(req: Request) {
       businessName = "NULL";
     }
 
-    let businessCategory = formData.get("businessCategory") as string || formData.get("otherCategory") as string;
+    let businessCategory =
+      (formData.get("businessCategory") as string) || (formData.get("otherCategory") as string);
     if (!businessCategory || businessCategory.trim() === "") {
       businessCategory = "NULL";
     }
@@ -151,19 +155,19 @@ export async function POST(req: Request) {
     // 5. Append Data to Google Sheets (IN EXACT COLUMN ORDER)
     // ---------------------------------------------------------
     const rowData = [
-      uid,                               // A: UID
-      formData.get("fullName"),          // B: Full Name
-      mobile,                            // C: Mobile
-      formData.get("email") || "NULL",   // D: Email
-      formData.get("gender"),            // E: Gender
-      attendeeType,                      // F: Visitor Type
-      businessName,                      // G: Business Name
-      businessCategory,                  // H: Business Category
-      formData.get("city"),              // I: City
-      formData.get("state"),             // J: State
-      formData.get("attendance"),        // K: Attending Days
-      photoUrl,                          // L: Photo Link
-      new Date().toISOString(),          // M: Timestamp
+      uid, // A: UID
+      formData.get("fullName"), // B: Full Name
+      mobile, // C: Mobile
+      formData.get("email") || "NULL", // D: Email
+      formData.get("gender"), // E: Gender
+      attendeeType, // F: Visitor Type
+      businessName, // G: Business Name
+      businessCategory, // H: Business Category
+      formData.get("city"), // I: City
+      formData.get("state"), // J: State
+      formData.get("attendance"), // K: Attending Days
+      photoUrl, // L: Photo Link
+      new Date().toISOString(), // M: Timestamp
     ];
 
     await sheets.spreadsheets.values.append({
@@ -178,12 +182,11 @@ export async function POST(req: Request) {
     // ---------------------------------------------------------
     // 6. Return Success
     // ---------------------------------------------------------
-    return NextResponse.json({ 
-      success: true, 
-      attendeeId: uid, 
-      message: "Registration successful" 
+    return NextResponse.json({
+      success: true,
+      attendeeId: uid,
+      message: "Registration successful",
     });
-
   } catch (error: any) {
     console.error("Submission Error:", error);
     return NextResponse.json(
