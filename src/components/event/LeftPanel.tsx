@@ -1,13 +1,19 @@
 import { Calendar, MapPin, Phone } from "lucide-react";
+import Image from "next/image";
 
 export function LeftPanel() {
   return (
     <div className="w-full lg:w-[40%] bg-[#0B1B2B] text-white p-8 md:p-12 flex flex-col justify-between">
       <div>
         <div className="mb-8">
-          <div className="h-10 w-48 bg-slate-800 rounded mb-6 flex items-center px-3 text-xs text-slate-400 border border-slate-700">
-            [ Logo Banner Placeholder ]
-          </div>
+        <Image
+            src="/logo-banner.jpeg"
+            alt="Tent Decor Expo"
+            width={300}
+            height={80}
+            priority
+            className="mb-6 object-contain"
+          />
           <h1 className="text-4xl md:text-5xl font-serif font-bold leading-tight mb-4 text-white">
             TENT DECOR EXPO UP <br /> 2026
           </h1>

@@ -41,9 +41,19 @@ const EVENT_DAYS = [
 
 const BUSINESS_CATEGORIES = [
   { value: "TENT", label: "Tent / टेंट" },
-  { value: "CATERING", label: "Catering / कैटरिंग" },
-  { value: "DECORATION", label: "Decoration / सजावट" },
+  { value: "CATERING", label: "Caterers / कैटरर्स" },
+  { value: "DECORATOR", label: "Decorator / डेकोरेटर" },
+  { value: "FLOWER", label: "Flower Decoration / फूल सजावट" },
+  { value: "DJ", label: "DJ / डीजे" },
+  { value: "LIGHT", label: "Light & Sound / लाइट एवं साउंड" },
   { value: "PHOTOGRAPHY", label: "Photography / फोटोग्राफी" },
+  { value: "VIDEOGRAPHY", label: "Videography / वीडियोग्राफी" },
+  { value: "EVENT_PLANNER", label: "Event Planner / इवेंट प्लानर" },
+  { value: "STAGE", label: "Stage Setup / स्टेज सजावट" },
+  { value: "BAND", label: "Band / बैंड" },
+  { value: "MAKEUP", label: "Makeup Artist / मेकअप आर्टिस्ट" },
+  { value: "HOTEL", label: "Hotel & Banquet / होटल एवं बैंक्वेट" },
+  { value: "TRANSPORT", label: "Transport / परिवहन" },
   { value: "OTHER", label: "Other (Please Specify) / अन्य" },
 ] as const;
 
@@ -53,9 +63,8 @@ const INDIAN_STATES = [
   "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
   "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
   "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Andaman and Nicobar Islands", "Chandigarh",
-  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
-  "Ladakh", "Lakshadweep", "Puducherry",
+  "Andaman and Nicobar Islands", "Chandigarh", "Delhi", "Jammu and Kashmir",
+  "Ladakh",
 ];
 
 interface RegFormProps {
@@ -644,11 +653,10 @@ export function RegForm({ onSuccess }: RegFormProps) {
                           return (
                             <FormItem className="flex-1 m-0">
                               <FormLabel
-                                className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all w-full ${
-                                  isChecked
-                                    ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md scale-[1.02]"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                                }`}
+                                className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all w-full ${isChecked
+                                  ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md scale-[1.02]"
+                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                                  }`}
                               >
                                 <FormControl className="hidden">
                                   <Checkbox
@@ -662,9 +670,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
                                 </FormControl>
                                 <span className="font-bold text-base">{item.title}</span>
                                 <span
-                                  className={`text-xs mt-1 font-medium ${
-                                    isChecked ? "text-slate-300" : "text-slate-400"
-                                  }`}
+                                  className={`text-xs mt-1 font-medium ${isChecked ? "text-slate-300" : "text-slate-400"
+                                    }`}
                                 >
                                   {item.date}
                                 </span>
