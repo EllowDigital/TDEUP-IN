@@ -292,12 +292,14 @@ export function RegForm({ onSuccess }: RegFormProps) {
   const showOrgSection = ["BUSINESS", "EXHIBITOR", "MEDIA"].includes(watchAttendeeType);
   const isBusy = form.formState.isSubmitting || isProcessingPhoto;
 
-return (
+  return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Help Banner */}
       <div className="bg-blue-50/80 border border-blue-200 text-blue-900 p-4 rounded-2xl text-sm mb-8 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:shadow-md">
         <div className="flex flex-col">
-          <span className="font-bold text-base mb-0.5">विज़िटर पास खो गया है? (Lost your pass?)</span>
+          <span className="font-bold text-base mb-0.5">
+            विज़िटर पास खो गया है? (Lost your pass?)
+          </span>
           <span className="text-blue-700 font-medium">अपना पुराना पास तुरंत वापस पाएं।</span>
         </div>
         <Button
@@ -336,8 +338,12 @@ return (
           ) : (
             <div className="w-full h-full rounded-full border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center group-hover:border-blue-500 group-hover:bg-blue-50/50 transition-all shadow-sm">
               <User className="w-10 h-10 sm:w-12 sm:h-12 text-slate-400 group-hover:text-blue-500 mb-2 transition-colors" />
-              <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600">Upload Photo</span>
-              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium mt-0.5">JPG • PNG • Max 10MB</span>
+              <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600">
+                Upload Photo
+              </span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium mt-0.5">
+                JPG • PNG • Max 10MB
+              </span>
             </div>
           )}
 
@@ -359,7 +365,10 @@ return (
         />
 
         {photoError && (
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600 mt-4 bg-red-50 py-2 px-3 rounded-lg" role="alert">
+          <p
+            className="flex items-center gap-1.5 text-xs font-semibold text-red-600 mt-4 bg-red-50 py-2 px-3 rounded-lg"
+            role="alert"
+          >
             <AlertCircle className="w-4 h-4 shrink-0" />
             {photoError}
           </p>
@@ -368,7 +377,6 @@ return (
 
       <Form {...form}>
         <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
-          
           {/* SECTION 1: Personal Details */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-8 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-4 mb-6">
@@ -376,8 +384,10 @@ return (
                 <User className="w-5 h-5 text-blue-600" />
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                Personal Details 
-                <span className="text-xs sm:text-sm font-medium text-slate-400">/ व्यक्तिगत विवरण</span>
+                Personal Details
+                <span className="text-xs sm:text-sm font-medium text-slate-400">
+                  / व्यक्तिगत विवरण
+                </span>
               </h3>
             </div>
 
@@ -388,7 +398,9 @@ return (
                   name="fullName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">Full Name / पूरा नाम *</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        Full Name / पूरा नाम *
+                      </FormLabel>
                       <FormControl>
                         <Input
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-blue-500/20"
@@ -406,7 +418,9 @@ return (
                   name="mobile"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">Mobile Number / मोबाइल नंबर *</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        Mobile Number / मोबाइल नंबर *
+                      </FormLabel>
                       <FormControl>
                         <Input
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-blue-500/20"
@@ -430,7 +444,9 @@ return (
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">Email Address <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        Email Address <span className="text-slate-400 font-normal">(Optional)</span>
+                      </FormLabel>
                       <FormControl>
                         <Input
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-blue-500/20"
@@ -449,7 +465,9 @@ return (
                   name="gender"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">Gender / लिंग *</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        Gender / लिंग *
+                      </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus:ring-blue-500/20">
@@ -477,8 +495,10 @@ return (
                 <Briefcase className="w-5 h-5 text-amber-600" />
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                Visitor Profile 
-                <span className="text-xs sm:text-sm font-medium text-slate-400">/ दर्शक प्रोफ़ाइल</span>
+                Visitor Profile
+                <span className="text-xs sm:text-sm font-medium text-slate-400">
+                  / दर्शक प्रोफ़ाइल
+                </span>
               </h3>
             </div>
 
@@ -488,7 +508,9 @@ return (
                 name="attendeeType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-semibold text-slate-700">Visitor Type / दर्शक का प्रकार *</FormLabel>
+                    <FormLabel className="text-sm font-semibold text-slate-700">
+                      Visitor Type / दर्शक का प्रकार *
+                    </FormLabel>
                     <Select
                       onValueChange={(val: string) => {
                         field.onChange(val);
@@ -622,8 +644,10 @@ return (
                 <MapPin className="w-5 h-5 text-emerald-600" />
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                Location & Attendance 
-                <span className="text-xs sm:text-sm font-medium text-slate-400">/ स्थान और उपस्थिति</span>
+                Location & Attendance
+                <span className="text-xs sm:text-sm font-medium text-slate-400">
+                  / स्थान और उपस्थिति
+                </span>
               </h3>
             </div>
 
@@ -633,7 +657,9 @@ return (
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-semibold text-slate-700">Full Address / पूरा पता *</FormLabel>
+                    <FormLabel className="text-sm font-semibold text-slate-700">
+                      Full Address / पूरा पता *
+                    </FormLabel>
                     <FormControl>
                       <Input
                         className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
@@ -653,7 +679,9 @@ return (
                   name="city"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">City / शहर *</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        City / शहर *
+                      </FormLabel>
                       <FormControl>
                         <Input
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
@@ -671,7 +699,9 @@ return (
                   name="state"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">State / राज्य *</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        State / राज्य *
+                      </FormLabel>
                       <FormControl>
                         <Input
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
@@ -690,7 +720,9 @@ return (
                   name="pincode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">Pincode *</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        Pincode *
+                      </FormLabel>
                       <FormControl>
                         <Input
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
@@ -750,7 +782,9 @@ return (
                                       }
                                     />
                                   </FormControl>
-                                  <span className="font-extrabold text-sm sm:text-lg">{item.title}</span>
+                                  <span className="font-extrabold text-sm sm:text-lg">
+                                    {item.title}
+                                  </span>
                                   <span
                                     className={`text-[10px] sm:text-xs mt-1 sm:mt-1.5 font-semibold tracking-wide uppercase ${
                                       isChecked ? "text-slate-300" : "text-slate-500"
