@@ -3,7 +3,12 @@
 import { useRef, useState, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { Download, User, MapPin } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+// import { QRCodeSVG } from "qrcode.react";
+// REMOVE THIS:
+// import { QRCodeSVG } from "qrcode.react";
+
+// ADD THIS INSTEAD:
+import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { FormValues } from "@/lib/schema";
 import { Cinzel } from "next/font/google";
@@ -23,14 +28,21 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   const passRef = useRef<HTMLDivElement>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
-  // Instantly create a local preview of the uploaded photo
+// Instantly create a local preview of the uploaded photo as Base64
   useEffect(() => {
     // @ts-ignore - photo is dynamically added to the FormValues object
     const file = attendeeData.photo;
+    
     if (file instanceof File) {
-      const url = URL.createObjectURL(file);
-      setPhotoUrl(url);
-      return () => URL.revokeObjectURL(url); // Cleanup memory
+      // Convert file to Base64 string instead of a Blob URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else if (typeof file === "string") {
+      // Fallback if it's already a regular URL
+      setPhotoUrl(file);
     }
   }, [attendeeData]);
 
@@ -38,18 +50,22 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
     if (!passRef.current) return;
 
     try {
+      // 1. Wait for custom fonts to load
       await document.fonts.ready;
+      
+      // 2. Wait 300ms to ensure the React DOM and profile image have fully painted on screen
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const dataUrl = await toPng(passRef.current, {
         cacheBust: true,
-        pixelRatio: 8,
+        pixelRatio: 3,
         backgroundColor: "#ffffff",
-
-        width: 350,
-        height: 560,
-
-        canvasWidth: 2800,
-        canvasHeight: 4800,
+        useCORS: true,
+        // Force the element to ignore any weird parent scaling during export
+        style: {
+          transform: "scale(1)",
+          transformOrigin: "top left",
+        },
       });
 
       const link = document.createElement("a");
@@ -61,6 +77,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
       document.body.removeChild(link);
     } catch (error) {
       console.error("Failed to download pass:", error);
+      alert("Failed to save the E-Pass. Please check your network and try again.");
     }
   };
   // --- DYNAMIC PASS THEME COLORS ---
@@ -179,14 +196,15 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
             {/* Left Column: Fast-Scan QR Code */}
             <div className="w-[45%] flex flex-col items-center justify-center border-r border-slate-200 pr-3">
               <div className="p-3 bg-white border-2 border-slate-200 rounded-xl">
-                <QRCodeSVG
-                  value={qrPayload}
-                  size={110}
-                  level="M"
-                  includeMargin={true}
-                  bgColor="#FFFFFF"
-                  fgColor="#000000"
-                />
+               {/* Change QRCodeSVG to QRCodeCanvas */}
+<QRCodeCanvas
+  value={qrPayload}
+  size={110}
+  level="M"
+  includeMargin={true}
+  bgColor="#FFFFFF"
+  fgColor="#000000"
+/>
               </div>
               <p className="text-[8px] text-slate-600 mt-2 font-bold tracking-widest uppercase">
                 SCAN AT ENTRY

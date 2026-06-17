@@ -9,20 +9,20 @@ import { SuccessPass } from "@/components/event/SuccessPass";
 export default function Home() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [attendeeData, setAttendeeData] = useState<FormValues | null>(null);
-  const [mockId, setMockId] = useState("");
+  // Renamed from mockId to attendeeId for clarity
+  const [attendeeId, setAttendeeId] = useState("");
 
-  const handleRegistrationSuccess = (data: FormValues) => {
-    // Generate mock ID for the UI. Later, the DB will give us a real ID.
-    const generatedId = `EVT${Math.floor(10000 + Math.random() * 90000)}`;
+  // CRITICAL FIX: The function now expects BOTH the data and the real ID from RegForm
+  const handleRegistrationSuccess = (data: FormValues, newId: string) => {
     setAttendeeData(data);
-    setMockId(generatedId);
+    setAttendeeId(newId); // Save the real ID (e.g., TDE26-G-4587) from the backend
     setIsRegistered(true);
   };
 
   const resetForm = () => {
     setIsRegistered(false);
     setAttendeeData(null);
-    setMockId("");
+    setAttendeeId("");
   };
 
   return (
@@ -39,7 +39,7 @@ export default function Home() {
           ) : (
             <SuccessPass 
               attendeeData={attendeeData} 
-              attendeeId={mockId} 
+              attendeeId={attendeeId} // Pass the real ID to the E-Pass
               onReset={resetForm} 
             />
           )}

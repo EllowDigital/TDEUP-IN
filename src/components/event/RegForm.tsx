@@ -253,7 +253,11 @@ const onSubmit = async (data: FormValues) => {
       alert(result.message || "Registration failed. Please try again.");
       return; 
     }
-
+    // --- ADD THESE 3 LINES TO CLEAR THE FORM ---
+    form.reset(); // Clears all text fields
+    setPhotoPreview(""); // Clears the profile picture
+    setCompressedPhoto(null); // Clears the file data
+    // -------------------------------------------
     // Trigger your success callback, passing BOTH the data and the new UID
     await onSuccess({ ...data, photo: compressedPhoto }, result.attendeeId);
 
