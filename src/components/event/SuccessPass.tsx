@@ -2,12 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { toPng } from "html-to-image";
-import { Download, User, MapPin } from "lucide-react";
-// import { QRCodeSVG } from "qrcode.react";
-// REMOVE THIS:
-// import { QRCodeSVG } from "qrcode.react";
-
-// ADD THIS INSTEAD:
+import { Download, User, MapPin, CheckCircle2 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { FormValues } from "@/lib/schema";
@@ -28,20 +23,17 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   const passRef = useRef<HTMLDivElement>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
-  // Instantly create a local preview of the uploaded photo as Base64
   useEffect(() => {
     // @ts-ignore - photo is dynamically added to the FormValues object
     const file = attendeeData.photo;
 
     if (file instanceof File) {
-      // Convert file to Base64 string instead of a Blob URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
     } else if (typeof file === "string") {
-      // Fallback if it's already a regular URL
       setTimeout(() => setPhotoUrl(file), 0);
     }
   }, [attendeeData]);
@@ -50,20 +42,17 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
     if (!passRef.current) return;
 
     try {
-      // 1. Wait for custom fonts to load
       await document.fonts.ready;
-
-      // 2. Wait 300ms to ensure the React DOM and profile image have fully painted on screen
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       const dataUrl = await toPng(passRef.current, {
         cacheBust: true,
         pixelRatio: 3,
         backgroundColor: "#ffffff",
-        // Force the element to ignore any weird parent scaling during export
         style: {
           transform: "scale(1)",
           transformOrigin: "top left",
+          margin: "0",
         },
       });
 
@@ -79,7 +68,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
       alert("Failed to save the E-Pass. Please check your network and try again.");
     }
   };
-  // --- DYNAMIC PASS THEME COLORS ---
+
   const getTheme = () => {
     switch (attendeeData.attendeeType) {
       case "BUSINESS":
@@ -96,11 +85,8 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   };
   const theme = getTheme();
 
-  // --- SMART ATTENDANCE DAYS LOGIC ---
   const displayDays =
     attendeeData.attendance.length === 3 ? "All Days" : attendeeData.attendance.join(", ");
-
-  // --- DYNAMIC QR CODE PAYLOAD ---
 
   const showOrgDetails = ["BUSINESS", "EXHIBITOR", "MEDIA"].includes(attendeeData.attendeeType);
 
@@ -125,17 +111,31 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   const qrPayload = JSON.stringify(qrData);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
-      {/* --- STRICT E-PASS LAYOUT FOR PNG DOWNLOAD --- */}
-      {/* This is the container attached to `passRef`. 
-        Everything inside here gets downloaded. Everything outside (like buttons) is ignored. 
-      */}
+    <div className="flex flex-col items-center justify-center h-full space-y-5 animate-in fade-in zoom-in duration-500 overflow-x-auto px-4 w-full py-6">
+      {/* --- ADDED: INSTRUCTION BANNER --- */}
+      <div className="flex flex-col items-center shrink-0 w-[350px]">
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl w-full text-center shadow-sm flex flex-col items-center justify-center space-y-1">
+          <div className="flex items-center space-x-1.5 justify-center">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <span className="font-bold text-[15px]">Registration Successful!</span>
+          </div>
+          <p className="text-[13px] font-medium text-emerald-700/80 leading-tight">
+            Please download your E-Pass below and keep it safe for entry.
+          </p>
+        </div>
+      </div>
+
+      {/* THE E-PASS CONTAINER */}
       <div
         ref={passRef}
-        className="overflow-hidden flex flex-col relative border-2 border-slate-200"
+        className="overflow-hidden flex flex-col relative border-2 border-slate-200 shrink-0 shadow-sm"
         style={{
           width: "350px",
+          minWidth: "350px",
+          maxWidth: "350px",
           height: "560px",
+          minHeight: "560px",
+          maxHeight: "560px",
           borderRadius: "16px",
           backgroundColor: "#ffffff",
           color: "#000000",
@@ -144,7 +144,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         }}
       >
         {/* Header Strip */}
-        <div className="h-[130px] bg-[#0B1B2B] flex flex-col items-center justify-center px-4 relative">
+        <div className="h-[130px] bg-[#0B1B2B] flex flex-col items-center justify-center px-4 relative shrink-0">
           <h2
             className={`${cinzel.className} text-[30px] font-bold uppercase text-center text-[#D4AF37]`}
           >
@@ -160,7 +160,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
 
         {/* Overlapping Profile Picture */}
         <div className="absolute top-[95px] left-1/2 -translate-x-1/2 z-10">
-          <div className="w-[90px] h-[90px] bg-[#EEF2F6] rounded-full border-[4px] border-white flex items-center justify-center overflow-hidden shadow-sm">
+          <div className="w-[90px] h-[90px] bg-[#EEF2F6] rounded-full border-[4px] border-white flex items-center justify-center overflow-hidden shadow-sm shrink-0">
             {photoUrl ? (
               <img src={photoUrl} alt="Attendee" className="w-full h-full object-cover" />
             ) : (
@@ -170,7 +170,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         </div>
 
         {/* Main Body Area */}
-        <div className="px-6 pt-[55px] pb-4 flex flex-col items-center w-full">
+        <div className="px-6 pt-[70px] pb-4 flex flex-col items-center w-full grow">
           {/* Identity & Status Section */}
           <div className="text-center w-full">
             <h3 className="font-serif font-bold text-[24px] text-[#000000] uppercase tracking-wide line-clamp-1">
@@ -179,7 +179,6 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
             <p className={`mt-1 text-[11px] font-bold tracking-[0.2em] uppercase ${theme.text}`}>
               {theme.label}
             </p>
-            {/* Conditional Firm/Media Name */}
             {showOrgDetails && (
               <p className="mt-1 text-[13px] text-slate-600 font-semibold uppercase line-clamp-1">
                 {attendeeData.businessName}
@@ -191,15 +190,15 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
           <div className="flex flex-row w-full mt-4 mb-2 items-center border-y border-slate-100 py-3">
             {/* Left Column: Fast-Scan QR Code */}
             <div className="w-[45%] flex flex-col items-center justify-center border-r border-slate-200 pr-3">
-              <div className="p-3 bg-white border-2 border-slate-200 rounded-xl">
+              <div className="p-3 bg-white border-2 border-slate-200 rounded-xl shrink-0">
                 <QRCodeCanvas
                   value={qrPayload}
-                  size={440} // 1. Make the internal image 4x larger for HD quality
-                  level="H" // 2. Change from "M" to "H" (High Error Correction) for fast scanning
+                  size={440}
+                  level="H"
                   includeMargin={true}
                   bgColor="#FFFFFF"
                   fgColor="#000000"
-                  style={{ width: "110px", height: "110px" }} // 3. Shrink it visually using CSS
+                  style={{ width: "110px", height: "110px" }}
                 />
               </div>
               <p className="text-[8px] text-slate-600 mt-2 font-bold tracking-widest uppercase">
@@ -227,7 +226,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
           </div>
 
           {/* Venue Information (Bottom Area) */}
-          <div className="mt-6 mb-4 flex flex-col items-center text-center px-4 w-full">
+          <div className="mt-6 mb-4 flex flex-col items-center text-center px-4 w-full shrink-0">
             <MapPin className="w-4 h-4 text-slate-400 mb-1" />
             <p className="text-[12px] text-slate-400 font-bold uppercase tracking-widest">
               Event Venue
@@ -239,14 +238,11 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         </div>
 
         {/* Dynamic Footer Theme Strip */}
-        <div className={`h-[16px] w-full mt-auto ${theme.bg}`}></div>
+        <div className={`h-[16px] w-full mt-auto shrink-0 ${theme.bg}`}></div>
       </div>
 
-      {/* --- EXTERNAL CONTROLS (Hidden from PNG) --- */}
-      {/* Because these buttons are OUTSIDE the div with `ref={passRef}`, 
-        they will not be included in the downloaded PNG. 
-      */}
-      <div className="flex flex-col gap-3 w-[350px]">
+      {/* External Controls */}
+      <div className="flex flex-col gap-3 w-[350px] shrink-0">
         <Button
           onClick={downloadPass}
           className="w-full bg-[#0B1B2B] hover:bg-[#15304B] py-6 text-[15px] font-semibold rounded-xl transition-all shadow-md hover:shadow-lg"
