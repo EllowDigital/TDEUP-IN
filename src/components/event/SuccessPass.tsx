@@ -195,16 +195,16 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
 
             {/* Left Column: Fast-Scan QR Code */}
             <div className="w-[45%] flex flex-col items-center justify-center border-r border-slate-200 pr-3">
-              <div className="p-3 bg-white border-2 border-slate-200 rounded-xl">
-               {/* Change QRCodeSVG to QRCodeCanvas */}
-<QRCodeCanvas
-  value={qrPayload}
-  size={110}
-  level="M"
-  includeMargin={true}
-  bgColor="#FFFFFF"
-  fgColor="#000000"
-/>
+             <div className="p-3 bg-white border-2 border-slate-200 rounded-xl">
+                <QRCodeCanvas
+                  value={qrPayload}
+                  size={440}        {/* 1. Make the internal image 4x larger for HD quality */}
+                  level="H"         {/* 2. Change from "M" to "H" (High Error Correction) for fast scanning */}
+                  includeMargin={true}
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
+                  style={{ width: "110px", height: "110px" }} {/* 3. Shrink it visually using CSS */}
+                />
               </div>
               <p className="text-[8px] text-slate-600 mt-2 font-bold tracking-widest uppercase">
                 SCAN AT ENTRY
