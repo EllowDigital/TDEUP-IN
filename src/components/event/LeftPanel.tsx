@@ -78,7 +78,7 @@ export function LeftPanel() {
 
           <p className="mx-auto max-w-sm text-sm leading-relaxed text-blue-100 md:text-base lg:mx-0">
             Join industry leaders, exhibitors, decorators, caterers and event professionals at Uttar
-            Pradesh's premier event industry expo.
+            Pradesh&apos;s premier event industry expo.
           </p>
         </div>
 

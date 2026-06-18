@@ -119,22 +119,24 @@ interface SuccessPassProps {
 
 export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassProps) {
   const passRef = useRef<HTMLDivElement>(null);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    const file = attendeeData.photo;
+  const file = attendeeData.photo;
+  const photoUrl =
+    typeof file === "string" && file.length > 0
+      ? file
+      : file == null
+        ? null
+        : localPhotoUrl;
 
+  useEffect(() => {
     if (file instanceof File) {
       const reader = new FileReader();
-      reader.onloadend = () => setPhotoUrl(reader.result as string);
+      reader.onloadend = () => setLocalPhotoUrl(reader.result as string);
       reader.readAsDataURL(file);
-    } else if (typeof file === "string" && file.length > 0) {
-      setPhotoUrl(file);
-    } else {
-      setPhotoUrl(null);
     }
-  }, [attendeeData.photo]);
+  }, [file]);
 
   const downloadPass = useCallback(async () => {
     if (!passRef.current || isExporting) return;
