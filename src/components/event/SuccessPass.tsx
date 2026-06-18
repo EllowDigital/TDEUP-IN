@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
+import Image from "next/image";
 import { toPng } from "html-to-image";
 import { Download, User, MapPin, CheckCircle2, Loader2 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -277,9 +278,11 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
         <div className="absolute top-[95px] left-1/2 -translate-x-1/2 z-10">
           <div className="w-[90px] h-[90px] bg-[#EEF2F6] rounded-full border-[4px] border-white flex items-center justify-center overflow-hidden shadow-sm shrink-0">
             {photoUrl ? (
-              <img
+              <Image
                 src={photoUrl}
                 alt="Attendee"
+                width={90}
+                height={90}
                 crossOrigin="anonymous"
                 className="w-full h-full object-cover"
               />

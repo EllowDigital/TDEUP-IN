@@ -91,7 +91,7 @@ interface RegisterResponse {
 function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
+    const img = new window.Image();
 
     img.onload = () => {
       try {
