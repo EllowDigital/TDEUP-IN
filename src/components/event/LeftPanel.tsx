@@ -7,12 +7,12 @@ const EVENT_DETAILS = {
   venueAddress: "Kidwai Nagar, Kanpur",
   phones: [
     {
-      display: "7905881922",
-      href: "tel:+917905881922",
-    },
-    {
       display: "9953903330",
       href: "tel:+919953903330",
+    },
+    {
+      display: "9415079434",
+      href: "tel:+919415079434",
     },
   ],
 } as const;

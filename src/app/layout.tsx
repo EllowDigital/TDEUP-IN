@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 
 // 2. Comprehensive SEO Metadata
 export const metadata: Metadata = {
-  metadataBase: new URL("https://your-domain.com"), // TODO: Replace with your actual live domain
+  metadataBase: new URL("https://tentdecorexpo.com"), // TODO: Replace with your actual live domain
   title: {
     default: "Tent Decor Expo UP 2026 | Kanpur",
     template: "%s | Tent Decor Expo UP 2026",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     siteName: "Tent Decor Expo UP 2026",
     images: [
       {
-        url: "/og-image.jpg", // TODO: Add a nice 1200x630px banner image to your /public folder
+        url: "/logo-banner.png", // TODO: Add a nice 1200x630px banner image to your /public folder
         width: 1200,
         height: 630,
         alt: "Tent Decor Expo UP 2026 Banner",
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     title: "Tent Decor Expo UP 2026",
     description:
       "The premier expo for tents, decorators, and caterers. Aug 30 - Sep 1, 2026 in Kanpur.",
-    images: ["/og-image.jpg"],
+    images: ["/logo-banner.png"],
   },
   robots: {
     index: true,

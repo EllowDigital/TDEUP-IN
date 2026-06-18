@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, Briefcase, Camera, Loader2, MapPin, Search, User } from "lucide-react";
@@ -425,9 +426,11 @@ export function RegForm({ onSuccess }: RegFormProps) {
           className="relative w-32 h-32 sm:w-40 sm:h-40 cursor-pointer group appearance-none bg-transparent border-0 p-0 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 disabled:cursor-wait transition-transform hover:scale-[1.02]"
         >
           {photoPreview ? (
-            <img
+            <Image
               src={photoPreview}
               alt="Uploaded profile preview"
+              width={160}
+              height={160}
               className="w-full h-full rounded-full object-cover border-4 border-white shadow-lg"
             />
           ) : (
