@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, Briefcase, Camera, Loader2, MapPin, Search, User } from "lucide-react";
@@ -30,9 +30,15 @@ import { State, City } from "country-state-city";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB, before client-side compression
 const MAX_PHOTO_DIMENSION = 800;
 const PHOTO_JPEG_QUALITY = 0.6;
+// Photos already at/under this size, already JPEG, and already small enough
+// dimension-wise skip re-encoding entirely — re-running a JPEG through
+// canvas + toBlob again only adds generational compression loss for files
+// that don't need it.
+const SKIP_COMPRESSION_BYTES = 400 * 1024; // 400KB
+const SUBMIT_TIMEOUT_MS = 30_000;
 
 const EVENT_DAYS = [
   { id: "30 August", title: "Day 1", date: "Aug 30" },
@@ -58,11 +64,18 @@ const BUSINESS_CATEGORIES = [
   { value: "OTHER", label: "Other (Please Specify) / अन्य" },
 ] as const;
 
-
+// India's state list never changes at runtime — compute it once at module
+// scope instead of on every render (or even via a hook).
+const INDIAN_STATES = State.getStatesOfCountry("IN");
 
 interface RegFormProps {
-  // Now it expects BOTH the data and the newly generated ID
+  // Expects both the validated data and the server-generated attendee ID.
   onSuccess: (data: FormValues, attendeeId: string) => void | Promise<void>;
+}
+
+interface RegisterResponse {
+  attendeeId?: string;
+  message?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +84,7 @@ interface RegFormProps {
 
 /**
  * Downscales + re-encodes an image client-side so uploads stay small.
+ * Skips re-encoding if the file is already a small JPEG within bounds.
  * Always revokes the temporary object URL it creates, on both success and failure.
  */
 function compressImage(file: File): Promise<File> {
@@ -81,15 +95,21 @@ function compressImage(file: File): Promise<File> {
     img.onload = () => {
       try {
         let { width, height } = img;
+        const needsResize = width > MAX_PHOTO_DIMENSION || height > MAX_PHOTO_DIMENSION;
 
-        if (width > height) {
-          if (width > MAX_PHOTO_DIMENSION) {
+        if (!needsResize && file.type === "image/jpeg" && file.size <= SKIP_COMPRESSION_BYTES) {
+          resolve(file);
+          return;
+        }
+
+        if (needsResize) {
+          if (width > height) {
             height = Math.round((height * MAX_PHOTO_DIMENSION) / width);
             width = MAX_PHOTO_DIMENSION;
+          } else {
+            width = Math.round((width * MAX_PHOTO_DIMENSION) / height);
+            height = MAX_PHOTO_DIMENSION;
           }
-        } else if (height > MAX_PHOTO_DIMENSION) {
-          width = Math.round((width * MAX_PHOTO_DIMENSION) / height);
-          height = MAX_PHOTO_DIMENSION;
         }
 
         const canvas = document.createElement("canvas");
@@ -102,6 +122,10 @@ function compressImage(file: File): Promise<File> {
           return;
         }
 
+        // JPEG has no alpha channel — fill white first so transparent
+        // source images (e.g. PNGs) don't turn black after re-encoding.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob(
@@ -129,17 +153,47 @@ function compressImage(file: File): Promise<File> {
   });
 }
 
+/** Builds the multipart payload sent to /api/register. */
+function buildRegistrationFormData(data: FormValues, photo: File | null): FormData {
+  const formData = new FormData();
+
+  Object.entries(data).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      formData.append(key, JSON.stringify(value));
+    } else if (typeof value === "string" && value.length > 0) {
+      formData.append(key, value);
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      formData.append(key, String(value));
+    }
+  });
+
+  if (photo) {
+    formData.append("photo", photo);
+  }
+
+  return formData;
+}
+
+/** Turns an HTML id-unsafe label (e.g. "30 August") into a safe id fragment. */
+function toSafeId(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, "-");
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function RegForm({ onSuccess }: RegFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Guards against concurrent submissions (e.g. pressing Enter rapidly),
+  // which can race ahead of React state updates from isSubmitting.
+  const isSubmittingRef = useRef(false);
 
   const [photoPreview, setPhotoPreview] = useState("");
   const [compressedPhoto, setCompressedPhoto] = useState<File | null>(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [submitError, setSubmitError] = useState("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -162,21 +216,22 @@ export function RegForm({ onSuccess }: RegFormProps) {
     },
   });
 
-  const states = State.getStatesOfCountry("IN");
-
   const selectedState = form.watch("state");
-
-  const selectedStateObj = states.find(
-    (s) => s.name === selectedState
-  );
-
-  const cities = selectedStateObj
-    ? City.getCitiesOfState("IN", selectedStateObj.isoCode)
-    : [];
-
-
   const watchAttendeeType = form.watch("attendeeType");
   const watchBusinessCategory = form.watch("businessCategory");
+
+  // Both lookups below were previously recomputed on every render (form.watch
+  // re-renders on every keystroke across the whole form). Memoizing keeps
+  // these tied only to the state that actually selects a different state.
+  const selectedStateObj = useMemo(
+    () => INDIAN_STATES.find((s) => s.name === selectedState),
+    [selectedState]
+  );
+
+  const cities = useMemo(
+    () => (selectedStateObj ? City.getCitiesOfState("IN", selectedStateObj.isoCode) : []),
+    [selectedStateObj]
+  );
 
   // Revoke the current preview URL whenever it's replaced or the component
   // unmounts, so we never leak blob URLs.
@@ -192,6 +247,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
     event.target.value = "";
 
     if (!file) return;
+    if (isSubmittingRef.current) return; // don't swap photo mid-submission
 
     setPhotoError("");
 
@@ -215,7 +271,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
         return URL.createObjectURL(compressed);
       });
     } catch (error) {
-      console.error(error);
+      console.error("Photo processing failed:", error);
       setPhotoError(
         "Couldn't process this image. Please try another photo / फ़ोटो प्रोसेस नहीं हो सकी"
       );
@@ -224,48 +280,107 @@ export function RegForm({ onSuccess }: RegFormProps) {
     }
   }, []);
 
-  const onSubmit = async (data: FormValues) => {
-    try {
-      const formData = new FormData();
+  // Centralizes the side-effects of switching visitor type so the Select's
+  // onValueChange stays readable.
+  const handleAttendeeTypeChange = useCallback(
+    (value: string) => {
+      form.setValue("attendeeType", value as FormValues["attendeeType"]);
 
-      // Append all text fields
-      Object.entries(data).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          formData.append(key, JSON.stringify(value)); // Handle the days array
-        } else if (value) {
-          formData.append(key, value as string);
-        }
-      });
-
-      // Append the compressed photo if it exists
-      if (compressedPhoto) {
-        formData.append("photo", compressedPhoto);
+      if (value === "MEDIA") {
+        // businessCategory is a required field in the schema but the
+        // category picker is hidden for MEDIA — store a sentinel value so
+        // validation still passes.
+        form.setValue("businessCategory", "Media/Press");
+        form.setValue("otherCategory", "");
+      } else if (value === "GENERAL") {
+        form.setValue("businessName", "");
+        form.setValue("businessCategory", "");
+        form.setValue("otherCategory", "");
+      } else {
+        form.setValue("businessCategory", "");
+        form.setValue("otherCategory", "");
       }
+    },
+    [form]
+  );
 
-      // Send to your Vercel backend
-      const response = await fetch("/api/register", {
-        method: "POST",
-        body: formData,
-      });
+  const onSubmit = async (data: FormValues) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setSubmitError("");
 
-      // Read the JSON response FIRST so we can see any custom error messages
-      const result = await response.json();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
 
-      if (!response.ok) {
-        // This alerts the user if their mobile number is a duplicate!
-        alert(result.message || "Registration failed. Please try again.");
+    try {
+      const formData = buildRegistrationFormData(data, compressedPhoto);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/register", {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+      } catch (networkError) {
+        if (networkError instanceof DOMException && networkError.name === "AbortError") {
+          setSubmitError(
+            "The request timed out. Please check your connection and try again / समय सीमा समाप्त, कृपया पुनः प्रयास करें।"
+          );
+        } else {
+          setSubmitError(
+            "Network error. Please check your connection and try again / नेटवर्क त्रुटि, कृपया पुनः प्रयास करें।"
+          );
+        }
         return;
       }
-      // --- ADD THESE 3 LINES TO CLEAR THE FORM ---
-      form.reset(); // Clears all text fields
-      setPhotoPreview(""); // Clears the profile picture
-      setCompressedPhoto(null); // Clears the file data
-      // -------------------------------------------
-      // Trigger your success callback, passing BOTH the data and the new UID
-      await onSuccess({ ...data, photo: compressedPhoto }, result.attendeeId);
+
+      // The server might fail before producing valid JSON (e.g. a gateway
+      // timeout returning an HTML page) — don't let that throw past us.
+      let result: RegisterResponse = {};
+      try {
+        result = await response.json();
+      } catch {
+        // fall through; handled by the !response.ok / missing attendeeId checks below
+      }
+
+      if (!response.ok) {
+        // Surfaces server-side validation issues, e.g. a duplicate mobile number.
+        setSubmitError(
+          result.message || `Registration failed (${response.status}). Please try again.`
+        );
+        return;
+      }
+
+      if (!result.attendeeId) {
+        setSubmitError(
+          "Registration could not be confirmed. Please try again or contact the help desk."
+        );
+        return;
+      }
+
+      // Registration is confirmed on the server at this point — reset local
+      // state unconditionally so the visitor can't accidentally double-submit,
+      // regardless of whether the onSuccess callback below succeeds.
+      const submittedPhoto = compressedPhoto;
+      form.reset();
+      setPhotoPreview("");
+      setCompressedPhoto(null);
+
+      try {
+        await onSuccess({ ...data, photo: submittedPhoto } as FormValues, result.attendeeId);
+      } catch (callbackError) {
+        console.error("onSuccess callback failed:", callbackError);
+        setSubmitError(
+          "You're registered! We couldn't load your E-Pass screen — please refresh, your registration is saved."
+        );
+      }
     } catch (error) {
       console.error("Submission failed:", error);
-      alert("Network error. Please check your connection and try again.");
+      setSubmitError("Something went wrong. Please try again.");
+    } finally {
+      clearTimeout(timeoutId);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -306,7 +421,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           aria-label="Upload profile photo / प्रोफ़ाइल फ़ोटो अपलोड करें"
-          disabled={isProcessingPhoto}
+          disabled={isBusy}
           className="relative w-32 h-32 sm:w-40 sm:h-40 cursor-pointer group appearance-none bg-transparent border-0 p-0 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 disabled:cursor-wait transition-transform hover:scale-[1.02]"
         >
           {photoPreview ? (
@@ -491,23 +606,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
                     <FormLabel className="text-sm font-semibold text-slate-700">
                       Visitor Type / दर्शक का प्रकार *
                     </FormLabel>
-                    <Select
-                      onValueChange={(val: string) => {
-                        field.onChange(val);
-                        if (val === "MEDIA") {
-                          form.setValue("businessCategory", "Media/Press");
-                          form.setValue("otherCategory", "");
-                        } else if (val === "GENERAL") {
-                          form.setValue("businessName", "");
-                          form.setValue("businessCategory", "");
-                          form.setValue("otherCategory", "");
-                        } else {
-                          form.setValue("businessCategory", "");
-                          form.setValue("otherCategory", "");
-                        }
-                      }}
-                      value={field.value}
-                    >
+                    <Select onValueChange={handleAttendeeTypeChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus:ring-amber-500/20">
                           <SelectValue placeholder="Select Type" />
@@ -735,20 +834,14 @@ export function RegForm({ onSuccess }: RegFormProps) {
               {/* City Suggestions */}
               <datalist id="indian-cities">
                 {cities.map((city) => (
-                  <option
-                    key={`${city.name}-${city.stateCode}`}
-                    value={city.name}
-                  />
+                  <option key={`${city.name}-${city.stateCode}`} value={city.name} />
                 ))}
               </datalist>
 
               {/* State Suggestions */}
               <datalist id="indian-states">
-                {states.map((state) => (
-                  <option
-                    key={state.isoCode}
-                    value={state.name}
-                  />
+                {INDIAN_STATES.map((state) => (
+                  <option key={state.isoCode} value={state.name} />
                 ))}
               </datalist>
 
@@ -770,36 +863,40 @@ export function RegForm({ onSuccess }: RegFormProps) {
                           name="attendance"
                           render={({ field }) => {
                             const isChecked = field.value?.includes(item.id);
+                            const dayInputId = `attendance-${toSafeId(item.id)}`;
 
                             return (
                               <FormItem className="flex-1 m-0">
-                                <FormLabel
-                                  className={`flex flex-col items-center justify-center p-3 sm:p-5 border-2 rounded-xl cursor-pointer transition-all w-full select-none ${isChecked
-                                      ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md sm:scale-[1.02]"
-                                      : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
-                                    }`}
-                                  onClick={() => {
-                                    if (isChecked) {
+                                <Checkbox
+                                  id={dayInputId}
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value ?? []), item.id]);
+                                    } else {
                                       field.onChange(
                                         field.value?.filter((value) => value !== item.id)
                                       );
-                                    } else {
-                                      field.onChange([
-                                        ...(field.value ?? []),
-                                        item.id,
-                                      ]);
                                     }
                                   }}
+                                  className="peer sr-only"
+                                />
+                                <FormLabel
+                                  htmlFor={dayInputId}
+                                  className={`flex flex-col items-center justify-center p-3 sm:p-5 border-2 rounded-xl cursor-pointer transition-all w-full select-none peer-focus-visible:ring-4 peer-focus-visible:ring-blue-500/40 peer-focus-visible:ring-offset-2 ${
+                                    isChecked
+                                      ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md sm:scale-[1.02]"
+                                      : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
+                                  }`}
                                 >
                                   <span className="font-extrabold text-sm sm:text-lg">
                                     {item.title}
                                   </span>
 
                                   <span
-                                    className={`text-[10px] sm:text-xs mt-1 sm:mt-1.5 font-semibold tracking-wide uppercase ${isChecked
-                                        ? "text-slate-300"
-                                        : "text-slate-500"
-                                      }`}
+                                    className={`text-[10px] sm:text-xs mt-1 sm:mt-1.5 font-semibold tracking-wide uppercase ${
+                                      isChecked ? "text-slate-300" : "text-slate-500"
+                                    }`}
                                   >
                                     {item.date}
                                   </span>
@@ -819,6 +916,16 @@ export function RegForm({ onSuccess }: RegFormProps) {
           </div>
 
           <div className="pt-4 pb-8">
+            {submitError && (
+              <p
+                className="flex items-center gap-1.5 text-sm font-semibold text-red-600 mb-4 bg-red-50 py-2.5 px-3.5 rounded-lg"
+                role="alert"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {submitError}
+              </p>
+            )}
+
             <Button
               type="submit"
               disabled={isBusy}

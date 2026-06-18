@@ -111,14 +111,8 @@ function waitForImagesToLoad(container: HTMLElement): Promise<void[]> {
   );
 }
 
-// The schema package doesn't know about the photo field, which is attached
-// dynamically on the client — extend it locally instead of using ts-ignore.
-type AttendeeDataWithPhoto = FormValues & {
-  photo?: File | string;
-};
-
 interface SuccessPassProps {
-  attendeeData: AttendeeDataWithPhoto;
+  attendeeData: FormValues;
   attendeeId: string;
   onReset: () => void;
 }
@@ -197,8 +191,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
   }, [attendeeData.attendeeType]);
 
   const displayDays = useMemo(
-    () =>
-      attendeeData.attendance.length === 3 ? "All Days" : attendeeData.attendance.join(", "),
+    () => (attendeeData.attendance.length === 3 ? "All Days" : attendeeData.attendance.join(", ")),
     [attendeeData.attendance]
   );
 
