@@ -47,7 +47,11 @@ async function getExistingPhotoUrl(mobile: string): Promise<string | null> {
   }
 }
 
-async function uploadToCloudinary(buffer: Buffer, mobile: string, retries = 2): Promise<string | null> {
+async function uploadToCloudinary(
+  buffer: Buffer,
+  mobile: string,
+  retries = 2
+): Promise<string | null> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await new Promise((resolve, reject) => {
@@ -108,14 +112,14 @@ export async function POST(req: Request) {
     // ---------------------------------------------------------
     const attendeeType = (formData.get("attendeeType") as string) || "GENERAL";
     const typeInitial = attendeeType.charAt(0).toUpperCase();
-    
+
     let attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
     const { data: existingUid } = await supabase
       .from("attendees")
       .select("attendee_id")
       .eq("attendee_id", attendee_id)
       .maybeSingle();
-      
+
     if (existingUid) {
       attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
     }
@@ -139,7 +143,7 @@ export async function POST(req: Request) {
     // Use actual DB nulls instead of string "NULL"
     let businessName: string | null = formData.get("businessName") as string;
     if (!businessName || businessName.trim() === "" || attendeeType === "GENERAL") {
-      businessName = null; 
+      businessName = null;
     }
 
     let businessCategory: string | null =
@@ -147,7 +151,7 @@ export async function POST(req: Request) {
     if (!businessCategory || businessCategory.trim() === "") {
       businessCategory = null;
     }
-    
+
     const fullName = formData.get("fullName") as string;
     const email = (formData.get("email") as string) || null;
     const gender = formData.get("gender") as string;
@@ -155,7 +159,7 @@ export async function POST(req: Request) {
     const city = formData.get("city") as string;
     const state = formData.get("state") as string;
     const pincode = formData.get("pincode") as string;
-    
+
     // Parse the JSON string from frontend into a native array for the TEXT[] column
     const rawAttendance = formData.get("attendance") as string;
     let attendanceArray: string[] = [];
@@ -196,28 +200,41 @@ export async function POST(req: Request) {
     // 6. Save to Google Sheets (Secondary Backup)
     // ---------------------------------------------------------
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    
+
     // Updated array to match the new 15-column layout
     const rowData = [
-      attendee_id, fullName, mobile, email || "N/A", gender, attendeeType, 
-      businessName || "N/A", businessCategory || "N/A", address, city, 
-      state, pincode, rawAttendance, photoUrl || "N/A", new Date().toISOString()
+      attendee_id,
+      fullName,
+      mobile,
+      email || "N/A",
+      gender,
+      attendeeType,
+      businessName || "N/A",
+      businessCategory || "N/A",
+      address,
+      city,
+      state,
+      pincode,
+      rawAttendance,
+      photoUrl || "N/A",
+      new Date().toISOString(),
     ];
 
     // Fire and forget sheets backup
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: "Sheet1!A:O", // Extended to column O to fit address & pincode
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [rowData] },
-    }).catch(err => console.error("Sheets Backup Error:", err));
+    await sheets.spreadsheets.values
+      .append({
+        spreadsheetId,
+        range: "Sheet1!A:O", // Extended to column O to fit address & pincode
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [rowData] },
+      })
+      .catch((err) => console.error("Sheets Backup Error:", err));
 
     return NextResponse.json({
       success: true,
       attendeeId: attendee_id,
       message: "Registration successful",
     });
-
   } catch (error: any) {
     console.error("Submission Error:", error);
     return NextResponse.json(
