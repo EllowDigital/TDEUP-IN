@@ -1,10 +1,10 @@
 {
-  "name": "event-reg-system",
+  "name": "tdeup2026",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
+    "dev": "next dev",
     "start": "next start",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
@@ -14,7 +14,11 @@
     "check": "npm run typecheck && npm run lint && npm run format:check",
     "prebuild": "npm run typecheck && npm run lint",
     "clean": "rimraf .next",
-    "rebuild": "npm run clean && npm run build"
+    "rebuild": "npm run clean && npm run build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "overrides": {
     "postcss": "^8.5.15"
