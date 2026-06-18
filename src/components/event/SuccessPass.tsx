@@ -124,11 +124,7 @@ export function SuccessPass({ attendeeData, attendeeId, onReset }: SuccessPassPr
 
   const file = attendeeData.photo;
   const photoUrl =
-    typeof file === "string" && file.length > 0
-      ? file
-      : file == null
-        ? null
-        : localPhotoUrl;
+    typeof file === "string" && file.length > 0 ? file : file == null ? null : localPhotoUrl;
 
   useEffect(() => {
     if (file instanceof File) {
