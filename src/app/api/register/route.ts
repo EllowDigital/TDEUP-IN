@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-export const runtime = "nodejs";
 import { google } from "googleapis";
 import { v2 as cloudinary } from "cloudinary";
+import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------
-// Configuration & Global Caching (For Speed)
+// Configuration & Global Caching
 // ---------------------------------------------------------
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -12,7 +12,12 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Initialize Google Auth OUTSIDE the handler so Vercel caches the connection
+// Initialize Supabase using Service Role Key to bypass RLS on the backend
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Initialize Google Auth
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -24,7 +29,6 @@ const sheets = google.sheets({ version: "v4", auth });
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-// Helper: Generate Alphanumeric Code
 function generateCode(length = 6) {
   let code = "";
   for (let i = 0; i < length; i++) {
@@ -33,7 +37,6 @@ function generateCode(length = 6) {
   return code;
 }
 
-// Helper: Check if photo already exists in Cloudinary
 async function getExistingPhotoUrl(mobile: string): Promise<string | null> {
   try {
     const publicId = `TDEUP_Visitors/${mobile}`;
@@ -44,8 +47,7 @@ async function getExistingPhotoUrl(mobile: string): Promise<string | null> {
   }
 }
 
-// Helper: Cloudinary Upload
-async function uploadToCloudinary(buffer: Buffer, mobile: string, retries = 2): Promise<string> {
+async function uploadToCloudinary(buffer: Buffer, mobile: string, retries = 2): Promise<string | null> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await new Promise((resolve, reject) => {
@@ -64,11 +66,11 @@ async function uploadToCloudinary(buffer: Buffer, mobile: string, retries = 2): 
         uploadStream.end(buffer);
       });
     } catch (error) {
-      if (attempt === retries) throw new Error("Image upload failed due to poor network.");
+      if (attempt === retries) return null;
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
-  return "Upload Failed";
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -83,26 +85,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-
     // ---------------------------------------------------------
-    // 1. FAST PARALLEL FETCH: Check Sheets & Cloudinary simultaneously
+    // 1. FAST DUPLICATE CHECK (Supabase)
     // ---------------------------------------------------------
-    // Note the ranges: Column C is Mobile, Column A is UID
-    const sheetsPromise = sheets.spreadsheets.values.batchGet({
-      spreadsheetId,
-      ranges: ["Sheet1!C:C", "Sheet1!A:A"],
-    });
-    const photoPromise = getExistingPhotoUrl(mobile);
+    const { data: existingUser, error: checkError } = await supabase
+      .from("attendees")
+      .select("mobile")
+      .eq("mobile", mobile.trim())
+      .maybeSingle();
 
-    // Wait for both network requests to finish at the same time
-    const [sheetsResponse, existingPhotoUrl] = await Promise.all([sheetsPromise, photoPromise]);
+    if (checkError) throw checkError;
 
-    const existingMobiles = sheetsResponse.data.valueRanges?.[0].values?.flat() || [];
-    const existingUids = sheetsResponse.data.valueRanges?.[1].values?.flat() || [];
-
-    // Reject Duplicate Mobile Numbers immediately
-    if (existingMobiles.includes(mobile.trim())) {
+    if (existingUser) {
       return NextResponse.json(
         { success: false, message: "User with this mobile number is already registered." },
         { status: 409 }
@@ -110,84 +104,120 @@ export async function POST(req: Request) {
     }
 
     // ---------------------------------------------------------
-    // 2. Generate Guaranteed Unique UID
+    // 2. Generate Unique attendee_id
     // ---------------------------------------------------------
     const attendeeType = (formData.get("attendeeType") as string) || "GENERAL";
     const typeInitial = attendeeType.charAt(0).toUpperCase();
-
-    let uid;
-    let safetyCounter = 0;
-    do {
-      uid = `TDE26-${typeInitial}-${generateCode(6)}`;
-      safetyCounter++;
-      if (safetyCounter > 10) throw new Error("Could not generate a unique UID");
-    } while (existingUids.includes(uid));
+    
+    let attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
+    const { data: existingUid } = await supabase
+      .from("attendees")
+      .select("attendee_id")
+      .eq("attendee_id", attendee_id)
+      .maybeSingle();
+      
+    if (existingUid) {
+      attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
+    }
 
     // ---------------------------------------------------------
-    // 3. Handle Photo Upload (Skip if existing was found)
+    // 3. Handle Photo Upload
     // ---------------------------------------------------------
-    let photoUrl = existingPhotoUrl;
+    let photoUrl = await getExistingPhotoUrl(mobile);
 
     if (!photoUrl) {
       const photoFile = formData.get("photo") as File | null;
       if (photoFile) {
         const buffer = Buffer.from(await photoFile.arrayBuffer());
         photoUrl = await uploadToCloudinary(buffer, mobile);
-      } else {
-        photoUrl = "NULL";
       }
     }
 
     // ---------------------------------------------------------
-    // 4. Parse Data & Apply "NULL" Logic
+    // 4. Parse & Format Data for DB Schema Constraints
     // ---------------------------------------------------------
-    let businessName = formData.get("businessName") as string;
+    // Use actual DB nulls instead of string "NULL"
+    let businessName: string | null = formData.get("businessName") as string;
     if (!businessName || businessName.trim() === "" || attendeeType === "GENERAL") {
-      businessName = "NULL";
+      businessName = null; 
     }
 
-    let businessCategory =
+    let businessCategory: string | null =
       (formData.get("businessCategory") as string) || (formData.get("otherCategory") as string);
     if (!businessCategory || businessCategory.trim() === "") {
-      businessCategory = "NULL";
+      businessCategory = null;
+    }
+    
+    const fullName = formData.get("fullName") as string;
+    const email = (formData.get("email") as string) || null;
+    const gender = formData.get("gender") as string;
+    const address = formData.get("address") as string;
+    const city = formData.get("city") as string;
+    const state = formData.get("state") as string;
+    const pincode = formData.get("pincode") as string;
+    
+    // Parse the JSON string from frontend into a native array for the TEXT[] column
+    const rawAttendance = formData.get("attendance") as string;
+    let attendanceArray: string[] = [];
+    try {
+      attendanceArray = JSON.parse(rawAttendance);
+    } catch {
+      attendanceArray = rawAttendance ? [rawAttendance] : [];
     }
 
     // ---------------------------------------------------------
-    // 5. Append Data to Google Sheets (IN EXACT COLUMN ORDER)
+    // 5. Save to Supabase (Primary Database)
     // ---------------------------------------------------------
+    const { error: insertError } = await supabase.from("attendees").insert([
+      {
+        attendee_id: attendee_id,
+        full_name: fullName,
+        mobile,
+        email,
+        gender,
+        attendee_type: attendeeType,
+        business_name: businessName,
+        business_category: businessCategory,
+        address,
+        city,
+        state,
+        pincode,
+        attendance_days: attendanceArray,
+        photo_url: photoUrl,
+      },
+    ]);
+
+    if (insertError) {
+      console.error("Supabase Insert Error:", insertError);
+      throw new Error("Failed to save registration data.");
+    }
+
+    // ---------------------------------------------------------
+    // 6. Save to Google Sheets (Secondary Backup)
+    // ---------------------------------------------------------
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    
+    // Updated array to match the new 15-column layout
     const rowData = [
-      uid, // A: UID
-      formData.get("fullName"), // B: Full Name
-      mobile, // C: Mobile
-      formData.get("email") || "NULL", // D: Email
-      formData.get("gender"), // E: Gender
-      attendeeType, // F: Visitor Type
-      businessName, // G: Business Name
-      businessCategory, // H: Business Category
-      formData.get("city"), // I: City
-      formData.get("state"), // J: State
-      formData.get("attendance"), // K: Attending Days
-      photoUrl, // L: Photo Link
-      new Date().toISOString(), // M: Timestamp
+      attendee_id, fullName, mobile, email || "N/A", gender, attendeeType, 
+      businessName || "N/A", businessCategory || "N/A", address, city, 
+      state, pincode, rawAttendance, photoUrl || "N/A", new Date().toISOString()
     ];
 
+    // Fire and forget sheets backup
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: "Sheet1!A:M",
+      range: "Sheet1!A:O", // Extended to column O to fit address & pincode
       valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [rowData],
-      },
-    });
+      requestBody: { values: [rowData] },
+    }).catch(err => console.error("Sheets Backup Error:", err));
 
-    // ---------------------------------------------------------
-    // 6. Return Success
-    // ---------------------------------------------------------
     return NextResponse.json({
       success: true,
-      attendeeId: uid,
+      attendeeId: attendee_id,
       message: "Registration successful",
     });
+
   } catch (error: any) {
     console.error("Submission Error:", error);
     return NextResponse.json(
