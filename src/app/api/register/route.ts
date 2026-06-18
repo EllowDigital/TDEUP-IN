@@ -12,10 +12,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Initialize Supabase using Service Role Key to bypass RLS on the backend
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Helper function to initialize Supabase ONLY when needed (fixes Vercel build error)
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables");
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 // Initialize Google Auth
 const auth = new google.auth.GoogleAuth({
@@ -79,6 +86,9 @@ async function uploadToCloudinary(
 
 export async function POST(req: Request) {
   try {
+    // Initialize Supabase inside the handler so it bypasses the build phase
+    const supabase = getSupabase();
+
     const formData = await req.formData();
     const mobile = formData.get("mobile") as string;
 
