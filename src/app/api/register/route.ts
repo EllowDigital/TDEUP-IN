@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 import { google } from "googleapis";
 import { v2 as cloudinary } from "cloudinary";
 
