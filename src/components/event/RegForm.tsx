@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { State, City } from "country-state-city";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -57,41 +58,7 @@ const BUSINESS_CATEGORIES = [
   { value: "OTHER", label: "Other (Please Specify) / अन्य" },
 ] as const;
 
-const INDIAN_STATES = [
-  "Andhra Pradesh",
-  "Arunachal Pradesh",
-  "Assam",
-  "Bihar",
-  "Chhattisgarh",
-  "Goa",
-  "Gujarat",
-  "Haryana",
-  "Himachal Pradesh",
-  "Jharkhand",
-  "Karnataka",
-  "Kerala",
-  "Madhya Pradesh",
-  "Maharashtra",
-  "Manipur",
-  "Meghalaya",
-  "Mizoram",
-  "Nagaland",
-  "Odisha",
-  "Punjab",
-  "Rajasthan",
-  "Sikkim",
-  "Tamil Nadu",
-  "Telangana",
-  "Tripura",
-  "Uttar Pradesh",
-  "Uttarakhand",
-  "West Bengal",
-  "Andaman and Nicobar Islands",
-  "Chandigarh",
-  "Delhi",
-  "Jammu and Kashmir",
-  "Ladakh",
-];
+
 
 interface RegFormProps {
   // Now it expects BOTH the data and the newly generated ID
@@ -194,6 +161,19 @@ export function RegForm({ onSuccess }: RegFormProps) {
       attendance: [],
     },
   });
+
+  const states = State.getStatesOfCountry("IN");
+
+  const selectedState = form.watch("state");
+
+  const selectedStateObj = states.find(
+    (s) => s.name === selectedState
+  );
+
+  const cities = selectedStateObj
+    ? City.getCitiesOfState("IN", selectedStateObj.isoCode)
+    : [];
+
 
   const watchAttendeeType = form.watch("attendeeType");
   const watchBusinessCategory = form.watch("businessCategory");
@@ -652,6 +632,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
             </div>
 
             <div className="space-y-5">
+              {/* Address */}
               <FormField
                 control={form.control}
                 name="address"
@@ -660,19 +641,22 @@ export function RegForm({ onSuccess }: RegFormProps) {
                     <FormLabel className="text-sm font-semibold text-slate-700">
                       Full Address / पूरा पता *
                     </FormLabel>
+
                     <FormControl>
                       <Input
+                        {...field}
                         className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
                         placeholder="123 Street Name, Area"
                         autoComplete="street-address"
-                        {...field}
                       />
                     </FormControl>
+
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* City / State / Pincode */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <FormField
                   control={form.control}
@@ -682,18 +666,22 @@ export function RegForm({ onSuccess }: RegFormProps) {
                       <FormLabel className="text-sm font-semibold text-slate-700">
                         City / शहर *
                       </FormLabel>
+
                       <FormControl>
                         <Input
-                          className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
-                          placeholder="Lucknow"
-                          autoComplete="address-level2"
                           {...field}
+                          className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
+                          placeholder="Type or select city"
+                          list="indian-cities"
+                          autoComplete="address-level2"
                         />
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="state"
@@ -702,19 +690,22 @@ export function RegForm({ onSuccess }: RegFormProps) {
                       <FormLabel className="text-sm font-semibold text-slate-700">
                         State / राज्य *
                       </FormLabel>
+
                       <FormControl>
                         <Input
+                          {...field}
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
-                          placeholder="Uttar Pradesh"
+                          placeholder="Type or select state"
                           list="indian-states"
                           autoComplete="address-level1"
-                          {...field}
                         />
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="pincode"
@@ -723,28 +714,45 @@ export function RegForm({ onSuccess }: RegFormProps) {
                       <FormLabel className="text-sm font-semibold text-slate-700">
                         Pincode *
                       </FormLabel>
+
                       <FormControl>
                         <Input
+                          {...field}
                           className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
                           placeholder="226001"
                           inputMode="numeric"
                           maxLength={6}
                           autoComplete="postal-code"
-                          {...field}
                         />
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              <datalist id="indian-states">
-                {INDIAN_STATES.map((s) => (
-                  <option key={s} value={s} />
+              {/* City Suggestions */}
+              <datalist id="indian-cities">
+                {cities.map((city) => (
+                  <option
+                    key={`${city.name}-${city.stateCode}`}
+                    value={city.name}
+                  />
                 ))}
               </datalist>
 
+              {/* State Suggestions */}
+              <datalist id="indian-states">
+                {states.map((state) => (
+                  <option
+                    key={state.isoCode}
+                    value={state.name}
+                  />
+                ))}
+              </datalist>
+
+              {/* Attendance Days */}
               <FormField
                 control={form.control}
                 name="attendance"
@@ -753,6 +761,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
                     <FormLabel className="text-sm font-bold text-slate-800 block mb-3">
                       Select Attending Days / उपस्थिति के दिन *
                     </FormLabel>
+
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       {EVENT_DAYS.map((item) => (
                         <FormField
@@ -761,34 +770,36 @@ export function RegForm({ onSuccess }: RegFormProps) {
                           name="attendance"
                           render={({ field }) => {
                             const isChecked = field.value?.includes(item.id);
+
                             return (
                               <FormItem className="flex-1 m-0">
                                 <FormLabel
-                                  className={`flex flex-col items-center justify-center p-3 sm:p-5 border-2 rounded-xl cursor-pointer transition-all w-full select-none ${
-                                    isChecked
+                                  className={`flex flex-col items-center justify-center p-3 sm:p-5 border-2 rounded-xl cursor-pointer transition-all w-full select-none ${isChecked
                                       ? "border-[#0B1B2B] bg-[#0B1B2B] text-white shadow-md sm:scale-[1.02]"
                                       : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
-                                  }`}
+                                    }`}
+                                  onClick={() => {
+                                    if (isChecked) {
+                                      field.onChange(
+                                        field.value?.filter((value) => value !== item.id)
+                                      );
+                                    } else {
+                                      field.onChange([
+                                        ...(field.value ?? []),
+                                        item.id,
+                                      ]);
+                                    }
+                                  }}
                                 >
-                                  <FormControl className="hidden">
-                                    <Checkbox
-                                      checked={isChecked}
-                                      onCheckedChange={(checked: boolean) =>
-                                        checked
-                                          ? field.onChange([...(field.value ?? []), item.id])
-                                          : field.onChange(
-                                              field.value?.filter((val) => val !== item.id)
-                                            )
-                                      }
-                                    />
-                                  </FormControl>
                                   <span className="font-extrabold text-sm sm:text-lg">
                                     {item.title}
                                   </span>
+
                                   <span
-                                    className={`text-[10px] sm:text-xs mt-1 sm:mt-1.5 font-semibold tracking-wide uppercase ${
-                                      isChecked ? "text-slate-300" : "text-slate-500"
-                                    }`}
+                                    className={`text-[10px] sm:text-xs mt-1 sm:mt-1.5 font-semibold tracking-wide uppercase ${isChecked
+                                        ? "text-slate-300"
+                                        : "text-slate-500"
+                                      }`}
                                   >
                                     {item.date}
                                   </span>
@@ -799,6 +810,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
                         />
                       ))}
                     </div>
+
                     <FormMessage className="mt-2" />
                   </FormItem>
                 )}

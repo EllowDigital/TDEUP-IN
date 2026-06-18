@@ -29,6 +29,7 @@
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.10.0",
     "clsx": "^2.1.1",
+    "country-state-city": "^3.2.1",
     "googleapis": "^173.0.0",
     "html-to-image": "^1.11.13",
     "html2canvas-pro": "^2.0.4",
