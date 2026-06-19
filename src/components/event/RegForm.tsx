@@ -66,7 +66,7 @@ const BUSINESS_CATEGORIES = [
   { value: "STAGE", label: "Stage Setup / स्टेज सजावट" },
   { value: "BAND", label: "Band / बैंड" },
   { value: "MAKEUP", label: "Makeup Artist / मेकअप आर्टिस्ट" },
-  { value: "HOTEL", label: "Lawn/Resort & Banquet / होटल एवं बैंक्वेट" },
+  { value: "BANQUET", label: "Lawn, Resort & Banquet / लॉन, रिज़ॉर्ट एवं बैंक्वेट" },
   { value: "TRANSPORT", label: "Transport / परिवहन" },
   { value: "OTHER", label: "Other (Please Specify) / अन्य" },
 ] as const;
@@ -272,7 +272,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
         businessName: dbData.business_name || "",
         businessCategory: dbData.business_category || "",
         otherCategory: dbData.other_category || "",
-        address: dbData.address, // <-- FIX: Added the missing address field here
+        address: dbData.address,
         city: dbData.city,
         state: dbData.state,
         pincode: dbData.pincode,
@@ -334,13 +334,9 @@ export function RegForm({ onSuccess }: RegFormProps) {
       if (value === "MEDIA") {
         form.setValue("businessCategory", "Media/Press");
         form.setValue("otherCategory", "");
-      } else if (value === "GENERAL") {
-        form.setValue("businessName", "");
+      } else if (form.getValues("businessCategory") === "Media/Press") {
+        // Only clear the category if they are switching AWAY from Media
         form.setValue("businessCategory", "");
-        form.setValue("otherCategory", "");
-      } else {
-        form.setValue("businessCategory", "");
-        form.setValue("otherCategory", "");
       }
     },
     [form]
@@ -420,7 +416,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
     }
   };
 
-  const showOrgSection = ["BUSINESS", "EXHIBITOR", "MEDIA"].includes(watchAttendeeType);
+  // Always true now, so the organization section is visible for GENERAL as well
+  const showOrgSection = true;
   const isBusy = form.formState.isSubmitting || isProcessingPhoto || isSearching;
 
   return (
@@ -638,7 +635,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-semibold text-slate-700">
-                        Email Address <span className="text-slate-400 font-normal">(Optional)</span>
+                        Email Address{" "}
+                        {/* <span className="text-slate-400 font-normal">(Optional)</span> */}
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -711,10 +709,21 @@ export function RegForm({ onSuccess }: RegFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="GENERAL">General Attendee / सामान्य</SelectItem>
-                        <SelectItem value="BUSINESS">Business Owner / व्यापार</SelectItem>
-                        <SelectItem value="EXHIBITOR">Exhibitor / प्रदर्शक / Supplier </SelectItem>
-                        <SelectItem value="MEDIA">Media / मीडिया</SelectItem>
+                        <SelectItem value="GENERAL">
+                          General Visitor / Industry Enthusiast / सामान्य आगंतुक
+                        </SelectItem>
+
+                        <SelectItem value="BUSINESS">
+                          Business Owner / Dealer / Buyer / व्यवसायी, डीलर एवं खरीदार
+                        </SelectItem>
+
+                        <SelectItem value="EXHIBITOR">
+                          Exhibitor / Supplier / Manufacturer / प्रदर्शक, सप्लायर एवं निर्माता
+                        </SelectItem>
+
+                        <SelectItem value="MEDIA">
+                          Media / Press / Influencer / मीडिया, प्रेस एवं इन्फ्लुएंसर
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -734,7 +743,9 @@ export function RegForm({ onSuccess }: RegFormProps) {
                           <FormLabel className="text-sm font-semibold text-slate-700">
                             {watchAttendeeType === "MEDIA"
                               ? "Media/Press Name / मीडिया का नाम *"
-                              : "Firm/Company Name / फर्म का नाम *"}
+                              : watchAttendeeType === "GENERAL"
+                                ? "Firm/Company Name / फर्म का नाम (Optional)"
+                                : "Firm/Company Name / फर्म का नाम *"}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -757,7 +768,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-sm font-semibold text-slate-700">
-                              Business Category / श्रेणी *
+                              Business Category / श्रेणी{" "}
+                              {watchAttendeeType === "GENERAL" ? "(Optional)" : "*"}
                             </FormLabel>
                             <Select
                               onValueChange={(val) => {
@@ -794,7 +806,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-sm font-semibold text-slate-700">
-                              Please Specify Category / कृपया श्रेणी निर्दिष्ट करें *
+                              Please Specify Category / कृपया श्रेणी निर्दिष्ट करें{" "}
+                              {watchAttendeeType === "GENERAL" ? "(Optional)" : "*"}
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -836,7 +849,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-sm font-semibold text-slate-700">
-                      Full Address / पूरा पता *
+                      Address / पता *
                     </FormLabel>
 
                     <FormControl>
@@ -857,30 +870,6 @@ export function RegForm({ onSuccess }: RegFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <FormField
                   control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-semibold text-slate-700">
-                        City / शहर *
-                      </FormLabel>
-
-                      <FormControl>
-                        <Input
-                          {...field}
-                          className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
-                          placeholder="Type or select city"
-                          list="indian-cities"
-                          autoComplete="address-level2"
-                        />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name="state"
                   render={({ field }) => (
                     <FormItem>
@@ -895,6 +884,30 @@ export function RegForm({ onSuccess }: RegFormProps) {
                           placeholder="Type or select state"
                           list="indian-states"
                           autoComplete="address-level1"
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-slate-700">
+                        City / शहर *
+                      </FormLabel>
+
+                      <FormControl>
+                        <Input
+                          {...field}
+                          className="h-12 bg-slate-50 border-slate-200 shadow-sm transition-colors hover:border-slate-300 focus-visible:ring-emerald-500/20"
+                          placeholder="Type or select city"
+                          list="indian-cities"
+                          autoComplete="address-level2"
                         />
                       </FormControl>
 

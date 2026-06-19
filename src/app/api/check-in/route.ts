@@ -45,9 +45,8 @@ export async function POST(req: Request) {
     // Update check-in status
     const { error: updateError } = await supabase
       .from("attendees")
-      .update({ checked_in: true, updated_at: new Date().toISOString() })
+      .update({ checked_in: true }) // <-- Removed updated_at here too!
       .eq("attendee_id", attendee_id);
-
     if (updateError) throw updateError;
 
     return NextResponse.json(

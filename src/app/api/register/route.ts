@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     const attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
 
     let businessName: string | null = formData.get("businessName") as string;
-    if (!businessName || businessName.trim() === "" || attendeeType === "GENERAL") {
+    if (!businessName || businessName.trim() === "") {
       businessName = null;
     }
 
