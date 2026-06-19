@@ -103,10 +103,15 @@ export async function POST(req: Request) {
       businessName = null;
     }
 
-    let businessCategory: string | null =
-      (formData.get("businessCategory") as string) || (formData.get("otherCategory") as string);
+    let businessCategory: string | null = formData.get("businessCategory") as string;
     if (!businessCategory || businessCategory.trim() === "") {
       businessCategory = null;
+    }
+
+    // Capture otherCategory separately
+    let otherCategory: string | null = formData.get("otherCategory") as string;
+    if (businessCategory !== "OTHER" || !otherCategory || otherCategory.trim() === "") {
+      otherCategory = null;
     }
 
     const fullName = formData.get("fullName") as string;
@@ -151,6 +156,7 @@ export async function POST(req: Request) {
         attendee_type: attendeeType,
         business_name: businessName,
         business_category: businessCategory,
+        other_category: otherCategory, // <-- Added into Supabase
         address,
         city,
         state,
@@ -189,19 +195,21 @@ export async function POST(req: Request) {
         attendeeType,
         businessName || "N/A",
         businessCategory || "N/A",
+        otherCategory || "N/A", // <-- Added otherCategory to Google Sheets
         address,
         city,
         state,
         pincode,
         attendanceArray.join(", "),
         photoUrl || "N/A",
+        "FALSE", // <-- Added checked_in column default value to Google Sheets
         new Date().toISOString(),
       ];
 
       // We await this so Vercel doesn't kill the background process
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: "Sheet1!A:O",
+        range: "Sheet1!A:Q", // <-- Changed range to Q because we now have 17 columns!
         valueInputOption: "USER_ENTERED",
         requestBody: { values: [rowData] },
       });

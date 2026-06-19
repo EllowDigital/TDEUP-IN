@@ -271,8 +271,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
         attendeeType: dbData.attendee_type as FormValues["attendeeType"],
         businessName: dbData.business_name || "",
         businessCategory: dbData.business_category || "",
-        otherCategory: "", // Keep empty as it's folded into businessCategory in DB
-        address: dbData.address,
+        otherCategory: dbData.other_category || "",
         city: dbData.city,
         state: dbData.state,
         pincode: dbData.pincode,
