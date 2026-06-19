@@ -4,7 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------
-// Configuration & Global Caching
+// Configuration & Global Settings
 // ---------------------------------------------------------
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -12,7 +12,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Helper function to initialize Supabase ONLY when needed (fixes Vercel build error)
+// Helper function to initialize Supabase
 function getSupabase() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,22 +36,15 @@ const sheets = google.sheets({ version: "v4", auth });
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+// ---------------------------------------------------------
+// Helper Functions
+// ---------------------------------------------------------
 function generateCode(length = 6) {
   let code = "";
   for (let i = 0; i < length; i++) {
     code += CHARS[Math.floor(Math.random() * CHARS.length)];
   }
   return code;
-}
-
-async function getExistingPhotoUrl(mobile: string): Promise<string | null> {
-  try {
-    const publicId = `TDEUP_Visitors/${mobile}`;
-    const result = await cloudinary.api.resource(publicId);
-    return result.secure_url;
-  } catch (error) {
-    return null;
-  }
 }
 
 async function uploadToCloudinary(
@@ -84,73 +77,27 @@ async function uploadToCloudinary(
   return null;
 }
 
+// ---------------------------------------------------------
+// Main POST Handler
+// ---------------------------------------------------------
 export async function POST(req: Request) {
   try {
-    // Initialize Supabase inside the handler so it bypasses the build phase
     const supabase = getSupabase();
-
     const formData = await req.formData();
     const mobile = formData.get("mobile") as string;
 
-    if (!mobile) {
+    if (!mobile || mobile.trim() === "") {
       return NextResponse.json(
         { success: false, message: "Mobile number is required." },
         { status: 400 }
       );
     }
 
-    // ---------------------------------------------------------
-    // 1. FAST DUPLICATE CHECK (Supabase)
-    // ---------------------------------------------------------
-    const { data: existingUser, error: checkError } = await supabase
-      .from("attendees")
-      .select("mobile")
-      .eq("mobile", mobile.trim())
-      .maybeSingle();
-
-    if (checkError) throw checkError;
-
-    if (existingUser) {
-      return NextResponse.json(
-        { success: false, message: "User with this mobile number is already registered." },
-        { status: 409 }
-      );
-    }
-
-    // ---------------------------------------------------------
-    // 2. Generate Unique attendee_id
-    // ---------------------------------------------------------
+    // 1. PREPARE DATA
     const attendeeType = (formData.get("attendeeType") as string) || "GENERAL";
     const typeInitial = attendeeType.charAt(0).toUpperCase();
+    const attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
 
-    let attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
-    const { data: existingUid } = await supabase
-      .from("attendees")
-      .select("attendee_id")
-      .eq("attendee_id", attendee_id)
-      .maybeSingle();
-
-    if (existingUid) {
-      attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
-    }
-
-    // ---------------------------------------------------------
-    // 3. Handle Photo Upload
-    // ---------------------------------------------------------
-    let photoUrl = await getExistingPhotoUrl(mobile);
-
-    if (!photoUrl) {
-      const photoFile = formData.get("photo") as File | null;
-      if (photoFile) {
-        const buffer = Buffer.from(await photoFile.arrayBuffer());
-        photoUrl = await uploadToCloudinary(buffer, mobile);
-      }
-    }
-
-    // ---------------------------------------------------------
-    // 4. Parse & Format Data for DB Schema Constraints
-    // ---------------------------------------------------------
-    // Use actual DB nulls instead of string "NULL"
     let businessName: string | null = formData.get("businessName") as string;
     if (!businessName || businessName.trim() === "" || attendeeType === "GENERAL") {
       businessName = null;
@@ -170,7 +117,6 @@ export async function POST(req: Request) {
     const state = formData.get("state") as string;
     const pincode = formData.get("pincode") as string;
 
-    // Parse the JSON string from frontend into a native array for the TEXT[] column
     const rawAttendance = formData.get("attendance") as string;
     let attendanceArray: string[] = [];
     try {
@@ -179,15 +125,28 @@ export async function POST(req: Request) {
       attendanceArray = rawAttendance ? [rawAttendance] : [];
     }
 
-    // ---------------------------------------------------------
-    // 5. Save to Supabase (Primary Database)
-    // ---------------------------------------------------------
+    // 2. UPLOAD PHOTO TO CLOUDINARY
+    let photoUrl = null;
+    const photoFile = formData.get("photo") as File | null;
+    if (photoFile && photoFile.size > 0) {
+      const buffer = Buffer.from(await photoFile.arrayBuffer());
+      photoUrl = await uploadToCloudinary(buffer, mobile.trim());
+
+      if (!photoUrl) {
+        console.warn(
+          `Failed to upload photo for ${mobile}, continuing registration without photo.`
+        );
+      }
+    }
+
+    // 3. ONE-SHOT SUPABASE INSERT
+    // We insert with needs_sync set to TRUE by default.
     const { error: insertError } = await supabase.from("attendees").insert([
       {
         attendee_id: attendee_id,
         full_name: fullName,
-        mobile,
-        email,
+        mobile: mobile.trim(),
+        email: email?.trim(),
         gender,
         attendee_type: attendeeType,
         business_name: businessName,
@@ -198,57 +157,79 @@ export async function POST(req: Request) {
         pincode,
         attendance_days: attendanceArray,
         photo_url: photoUrl,
+        checked_in: null,
+        needs_sync: true, // Start as true
       },
     ]);
 
+    // Handle duplicate mobile numbers gracefully
     if (insertError) {
+      if (insertError.code === "23505") {
+        return NextResponse.json(
+          { success: false, message: "You are already registered with this mobile number." },
+          { status: 409 }
+        );
+      }
       console.error("Supabase Insert Error:", insertError);
-      throw new Error("Failed to save registration data.");
+      return NextResponse.json(
+        { success: false, message: "Failed to save registration data to our servers." },
+        { status: 500 }
+      );
     }
 
-    // ---------------------------------------------------------
-    // 6. Save to Google Sheets (Secondary Backup)
-    // ---------------------------------------------------------
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    // 4. ATTEMPT GOOGLE SHEETS BACKUP
+    try {
+      const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+      const rowData = [
+        attendee_id,
+        fullName,
+        mobile.trim(),
+        email || "N/A",
+        gender,
+        attendeeType,
+        businessName || "N/A",
+        businessCategory || "N/A",
+        address,
+        city,
+        state,
+        pincode,
+        attendanceArray.join(", "),
+        photoUrl || "N/A",
+        new Date().toISOString(),
+      ];
 
-    // Updated array to match the new 15-column layout
-    const rowData = [
-      attendee_id,
-      fullName,
-      mobile,
-      email || "N/A",
-      gender,
-      attendeeType,
-      businessName || "N/A",
-      businessCategory || "N/A",
-      address,
-      city,
-      state,
-      pincode,
-      rawAttendance,
-      photoUrl || "N/A",
-      new Date().toISOString(),
-    ];
-
-    // Fire and forget sheets backup
-    await sheets.spreadsheets.values
-      .append({
+      // We await this so Vercel doesn't kill the background process
+      await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: "Sheet1!A:O", // Extended to column O to fit address & pincode
+        range: "Sheet1!A:O",
         valueInputOption: "USER_ENTERED",
         requestBody: { values: [rowData] },
-      })
-      .catch((err) => console.error("Sheets Backup Error:", err));
+      });
 
-    return NextResponse.json({
-      success: true,
-      attendeeId: attendee_id,
-      message: "Registration successful",
-    });
-  } catch (error: any) {
-    console.error("Submission Error:", error);
+      // 5. IF SHEETS SUCCEEDS -> UPDATE SUPABASE needs_sync TO FALSE
+      await supabase.from("attendees").update({ needs_sync: false }).eq("mobile", mobile.trim());
+    } catch (sheetError) {
+      // IF SHEETS FAILS -> We catch the error so the app DOES NOT crash.
+      // Supabase still has needs_sync = true for this user.
+      console.error(
+        `Google Sheets sync failed for ${mobile}, but data is safe in Supabase.`,
+        sheetError
+      );
+    }
+
+    // 6. RETURN SUCCESS
     return NextResponse.json(
-      { success: false, message: error.message || "Failed to submit registration." },
+      {
+        success: true,
+        attendeeId: attendee_id,
+        message: "Registration successful!",
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    console.error("Critical Submission Error:", error);
+    return NextResponse.json(
+      { success: false, message: error.message || "An unexpected system error occurred." },
       { status: 500 }
     );
   }

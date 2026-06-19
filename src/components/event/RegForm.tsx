@@ -4,7 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Briefcase, Camera, Loader2, MapPin, Search, User } from "lucide-react";
+import {
+  AlertCircle,
+  Briefcase,
+  Camera,
+  Download,
+  Loader2,
+  MapPin,
+  Search,
+  User,
+  X,
+} from "lucide-react";
 
 import { formSchema, type FormValues } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
@@ -31,14 +41,10 @@ import { State, City } from "country-state-city";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB, before client-side compression
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 const MAX_PHOTO_DIMENSION = 800;
 const PHOTO_JPEG_QUALITY = 0.6;
-// Photos already at/under this size, already JPEG, and already small enough
-// dimension-wise skip re-encoding entirely — re-running a JPEG through
-// canvas + toBlob again only adds generational compression loss for files
-// that don't need it.
-const SKIP_COMPRESSION_BYTES = 400 * 1024; // 400KB
+const SKIP_COMPRESSION_BYTES = 400 * 1024;
 const SUBMIT_TIMEOUT_MS = 30_000;
 
 const EVENT_DAYS = [
@@ -65,12 +71,9 @@ const BUSINESS_CATEGORIES = [
   { value: "OTHER", label: "Other (Please Specify) / अन्य" },
 ] as const;
 
-// India's state list never changes at runtime — compute it once at module
-// scope instead of on every render (or even via a hook).
 const INDIAN_STATES = State.getStatesOfCountry("IN");
 
 interface RegFormProps {
-  // Expects both the validated data and the server-generated attendee ID.
   onSuccess: (data: FormValues, attendeeId: string) => void | Promise<void>;
 }
 
@@ -83,11 +86,6 @@ interface RegisterResponse {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Downscales + re-encodes an image client-side so uploads stay small.
- * Skips re-encoding if the file is already a small JPEG within bounds.
- * Always revokes the temporary object URL it creates, on both success and failure.
- */
 function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -123,8 +121,6 @@ function compressImage(file: File): Promise<File> {
           return;
         }
 
-        // JPEG has no alpha channel — fill white first so transparent
-        // source images (e.g. PNGs) don't turn black after re-encoding.
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
@@ -154,7 +150,6 @@ function compressImage(file: File): Promise<File> {
   });
 }
 
-/** Builds the multipart payload sent to /api/register. */
 function buildRegistrationFormData(data: FormValues, photo: File | null): FormData {
   const formData = new FormData();
 
@@ -175,7 +170,6 @@ function buildRegistrationFormData(data: FormValues, photo: File | null): FormDa
   return formData;
 }
 
-/** Turns an HTML id-unsafe label (e.g. "30 August") into a safe id fragment. */
 function toSafeId(value: string): string {
   return value.toLowerCase().replace(/\s+/g, "-");
 }
@@ -186,15 +180,20 @@ function toSafeId(value: string): string {
 
 export function RegForm({ onSuccess }: RegFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Guards against concurrent submissions (e.g. pressing Enter rapidly),
-  // which can race ahead of React state updates from isSubmitting.
   const isSubmittingRef = useRef(false);
 
+  // Registration State
   const [photoPreview, setPhotoPreview] = useState("");
   const [compressedPhoto, setCompressedPhoto] = useState<File | null>(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [submitError, setSubmitError] = useState("");
+
+  // Find Pass State
+  const [isFindingPass, setIsFindingPass] = useState(false);
+  const [findMobile, setFindMobile] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [findError, setFindError] = useState("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -221,9 +220,6 @@ export function RegForm({ onSuccess }: RegFormProps) {
   const watchAttendeeType = form.watch("attendeeType");
   const watchBusinessCategory = form.watch("businessCategory");
 
-  // Both lookups below were previously recomputed on every render (form.watch
-  // re-renders on every keystroke across the whole form). Memoizing keeps
-  // these tied only to the state that actually selects a different state.
   const selectedStateObj = useMemo(
     () => INDIAN_STATES.find((s) => s.name === selectedState),
     [selectedState]
@@ -234,21 +230,71 @@ export function RegForm({ onSuccess }: RegFormProps) {
     [selectedStateObj]
   );
 
-  // Revoke the current preview URL whenever it's replaced or the component
-  // unmounts, so we never leak blob URLs.
   useEffect(() => {
     return () => {
       if (photoPreview) URL.revokeObjectURL(photoPreview);
     };
   }, [photoPreview]);
 
+  // Handle Find Pass API Call
+  const handleFindPass = async () => {
+    if (!findMobile || findMobile.length < 10) {
+      setFindError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+
+    setIsSearching(true);
+    setFindError("");
+
+    try {
+      const res = await fetch("/api/find-pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: findMobile }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setFindError(result.message || "No pass found for this number.");
+        return;
+      }
+
+      const dbData = result.attendee;
+
+      // Map Supabase snake_case to React Hook Form camelCase FormValues
+      const mappedData: FormValues = {
+        fullName: dbData.full_name,
+        mobile: dbData.mobile,
+        email: dbData.email || "",
+        gender: dbData.gender as FormValues["gender"],
+        attendeeType: dbData.attendee_type as FormValues["attendeeType"],
+        businessName: dbData.business_name || "",
+        businessCategory: dbData.business_category || "",
+        otherCategory: "", // Keep empty as it's folded into businessCategory in DB
+        address: dbData.address,
+        city: dbData.city,
+        state: dbData.state,
+        pincode: dbData.pincode,
+        attendance: dbData.attendance_days || [],
+        photo: dbData.photo_url || null, // URL string, SuccessPass handles this natively!
+      };
+
+      // Trigger success to render SuccessPass.tsx
+      await onSuccess(mappedData, dbData.attendee_id);
+    } catch (error) {
+      setFindError("Network error. Please try again.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handlePhotoUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    // Reset the input so choosing the same file again still fires onChange.
     event.target.value = "";
 
     if (!file) return;
-    if (isSubmittingRef.current) return; // don't swap photo mid-submission
+    if (isSubmittingRef.current) return;
 
     setPhotoError("");
 
@@ -281,16 +327,11 @@ export function RegForm({ onSuccess }: RegFormProps) {
     }
   }, []);
 
-  // Centralizes the side-effects of switching visitor type so the Select's
-  // onValueChange stays readable.
   const handleAttendeeTypeChange = useCallback(
     (value: string) => {
       form.setValue("attendeeType", value as FormValues["attendeeType"]);
 
       if (value === "MEDIA") {
-        // businessCategory is a required field in the schema but the
-        // category picker is hidden for MEDIA — store a sentinel value so
-        // validation still passes.
         form.setValue("businessCategory", "Media/Press");
         form.setValue("otherCategory", "");
       } else if (value === "GENERAL") {
@@ -336,17 +377,14 @@ export function RegForm({ onSuccess }: RegFormProps) {
         return;
       }
 
-      // The server might fail before producing valid JSON (e.g. a gateway
-      // timeout returning an HTML page) — don't let that throw past us.
       let result: RegisterResponse = {};
       try {
         result = await response.json();
       } catch {
-        // fall through; handled by the !response.ok / missing attendeeId checks below
+        // fall through
       }
 
       if (!response.ok) {
-        // Surfaces server-side validation issues, e.g. a duplicate mobile number.
         setSubmitError(
           result.message || `Registration failed (${response.status}). Please try again.`
         );
@@ -360,9 +398,6 @@ export function RegForm({ onSuccess }: RegFormProps) {
         return;
       }
 
-      // Registration is confirmed on the server at this point — reset local
-      // state unconditionally so the visitor can't accidentally double-submit,
-      // regardless of whether the onSuccess callback below succeeds.
       const submittedPhoto = compressedPhoto;
       form.reset();
       setPhotoPreview("");
@@ -386,10 +421,69 @@ export function RegForm({ onSuccess }: RegFormProps) {
   };
 
   const showOrgSection = ["BUSINESS", "EXHIBITOR", "MEDIA"].includes(watchAttendeeType);
-  const isBusy = form.formState.isSubmitting || isProcessingPhoto;
+  const isBusy = form.formState.isSubmitting || isProcessingPhoto || isSearching;
 
   return (
     <div className="w-full max-w-4xl mx-auto">
+      {/* Find Pass Popup Modal */}
+      {isFindingPass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <Search className="w-5 h-5 text-blue-600" />
+                Find Your Pass
+              </h3>
+              <button
+                onClick={() => {
+                  setIsFindingPass(false);
+                  setFindError("");
+                  setFindMobile("");
+                }}
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              <p className="text-sm text-slate-500 font-medium">
+                Enter the 10-digit mobile number you used during registration to retrieve your
+                E-Pass.
+              </p>
+
+              <div className="space-y-3">
+                <Input
+                  placeholder="Enter Mobile Number"
+                  value={findMobile}
+                  onChange={(e) => setFindMobile(e.target.value.replace(/\D/g, ""))}
+                  maxLength={10}
+                  className="h-12 bg-white border-slate-300 focus-visible:ring-blue-500 text-lg tracking-wider"
+                  autoFocus
+                />
+
+                {findError && (
+                  <p className="text-red-600 text-xs font-semibold flex items-center bg-red-50 p-2.5 rounded-lg border border-red-100">
+                    <AlertCircle className="w-4 h-4 mr-1.5 shrink-0" /> {findError}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                onClick={handleFindPass}
+                disabled={isSearching}
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm"
+              >
+                {isSearching ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                {isSearching ? "Searching..." : "Retrieve Pass"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Help Banner */}
       <div className="bg-blue-50/80 border border-blue-200 text-blue-900 p-4 rounded-2xl text-sm mb-8 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:shadow-md">
         <div className="flex flex-col">
@@ -401,6 +495,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
         <Button
           variant="outline"
           type="button"
+          onClick={() => setIsFindingPass(true)}
           className="bg-white text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 whitespace-nowrap w-full sm:w-auto rounded-xl h-11 font-semibold shadow-sm"
         >
           <Search className="w-4 h-4 mr-2" /> Find Pass
@@ -920,13 +1015,29 @@ export function RegForm({ onSuccess }: RegFormProps) {
 
           <div className="pt-4 pb-8">
             {submitError && (
-              <p
-                className="flex items-center gap-1.5 text-sm font-semibold text-red-600 mb-4 bg-red-50 py-2.5 px-3.5 rounded-lg"
-                role="alert"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {submitError}
-              </p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm font-semibold text-red-600 mb-4 bg-red-50 py-3 px-4 rounded-xl border border-red-100">
+                <p className="flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {submitError}
+                </p>
+
+                {/* Show Download Button ONLY if they are already registered */}
+                {submitError.includes("already registered") && (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      // Auto-fill the popup with the mobile number they just typed
+                      setFindMobile(form.getValues("mobile"));
+                      setIsFindingPass(true); // Open the popup
+                      setSubmitError(""); // Clear the error message
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white shadow-sm shrink-0 h-9 rounded-lg px-3"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Pass
+                  </Button>
+                )}
+              </div>
             )}
 
             <Button
