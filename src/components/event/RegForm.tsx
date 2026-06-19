@@ -216,6 +216,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
     },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedState = form.watch("state");
   const watchAttendeeType = form.watch("attendeeType");
   const watchBusinessCategory = form.watch("businessCategory");

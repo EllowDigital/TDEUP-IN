@@ -19,20 +19,18 @@ export default function AdminDashboard() {
   const [isExporting, setIsExporting] = useState<"csv" | "sql" | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
-  const fetchStats = async () => {
-    try {
-      const res = await fetch("/api/admin/stats");
-      const data = await res.json();
-      if (res.ok) setStats(data);
-    } catch (error) {
-      console.error("Failed to fetch stats");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchStats();
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/stats");
+        const data = await res.json();
+        if (res.ok) setStats(data);
+      } catch (error) {
+        console.error("Failed to fetch stats");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
   const handleSync = async () => {
@@ -43,7 +41,14 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         setMessage({ text: data.message, type: "success" });
-        fetchStats(); // Refresh numbers
+        // Refresh numbers
+        try {
+          const res = await fetch("/api/admin/stats");
+          const data = await res.json();
+          if (res.ok) setStats(data);
+        } catch (error) {
+          console.error("Failed to fetch stats");
+        }
       } else {
         setMessage({ text: data.message || "Sync failed", type: "error" });
       }

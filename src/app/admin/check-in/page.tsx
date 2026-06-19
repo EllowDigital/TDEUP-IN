@@ -143,9 +143,11 @@ export default function CheckInPage() {
                 <div className="space-y-4">
                   <div className="aspect-square rounded-2xl overflow-hidden bg-black relative border-4 border-slate-100 shadow-inner">
                     <Scanner
-                      onResult={(text) => handleScan(text)}
-                      onError={(error) => console.log(error?.message)}
-                      options={{ delayBetweenScanSuccess: 2000 }}
+                      onScan={(detectedCodes) => {
+                        if (detectedCodes.length > 0) {
+                          handleScan(detectedCodes[0].rawValue);
+                        }
+                      }}
                     />
                     {/* Scanner Overlay UI */}
                     <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none z-10" />
