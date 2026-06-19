@@ -9,6 +9,7 @@ function getSupabase() {
   );
 }
 
+// Initialize Google Auth
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -18,76 +19,78 @@ const auth = new google.auth.GoogleAuth({
 });
 const sheets = google.sheets({ version: "v4", auth });
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
-    // SECURITY NOTE: In a real app, ensure you verify an admin session/token here
-    // so public users cannot trigger this sync randomly.
-
     const supabase = getSupabase();
 
-    // 1. Fetch all unsynced rows
-    const { data: unsyncedUsers, error: fetchError } = await supabase
+    // 1. Fetch all attendees that need syncing
+    const { data: unsynced, error: fetchError } = await supabase
       .from("attendees")
       .select("*")
       .eq("needs_sync", true);
 
     if (fetchError) throw fetchError;
 
-    if (!unsyncedUsers || unsyncedUsers.length === 0) {
-      return NextResponse.json(
-        { success: true, message: "Everything is already synced up!" },
-        { status: 200 }
-      );
+    if (!unsynced || unsynced.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "Google Sheets is already completely up to date!",
+      });
     }
 
-    // 2. Format data for Google Sheets
-    const rowsData = unsyncedUsers.map((user) => [
-      user.attendee_id,
-      user.full_name,
-      user.mobile,
-      user.email || "N/A",
-      user.gender,
-      user.attendee_type,
-      user.business_name || "N/A",
-      user.business_category || "N/A",
-      user.address,
-      user.city,
-      user.state,
-      user.pincode,
-      Array.isArray(user.attendance_days) ? user.attendance_days.join(", ") : user.attendance_days,
-      user.photo_url || "N/A",
-      user.created_at,
-    ]);
+    // 2. Format the rows to exactly match your 17 Google Sheet Columns
+    const rowsToAppend = unsynced.map((row) => {
+      const days = Array.isArray(row.attendance_days)
+        ? row.attendance_days.join(", ")
+        : row.attendance_days;
 
-    // 3. Bulk append to Google Sheets
+      return [
+        row.attendee_id,
+        row.full_name,
+        row.mobile,
+        row.email || "N/A",
+        row.gender,
+        row.attendee_type,
+        row.business_name || "N/A",
+        row.business_category || "N/A",
+        row.other_category || "N/A",
+        row.address,
+        row.city,
+        row.state,
+        row.pincode,
+        days,
+        row.photo_url || "N/A",
+        row.checked_in ? "TRUE" : "FALSE",
+        row.created_at,
+      ];
+    });
+
+    // 3. Batch Append to Google Sheets
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: "Sheet1!A:O",
+      range: "Sheet1!A:Q",
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: rowsData },
+      requestBody: { values: rowsToAppend },
     });
 
-    // 4. Update Supabase: Mark these exact users as synced
-    const syncedMobiles = unsyncedUsers.map((u) => u.mobile);
+    // 4. If Google Sheets succeeds, update Supabase `needs_sync` to false
+    const syncedIds = unsynced.map((u) => u.id);
     const { error: updateError } = await supabase
       .from("attendees")
       .update({ needs_sync: false })
-      .in("mobile", syncedMobiles);
+      .in("id", syncedIds);
 
     if (updateError) throw updateError;
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: `Successfully synced ${unsyncedUsers.length} missing records to Google Sheets!`,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success: true,
+      message: `Successfully synced ${unsynced.length} records to Google Sheets!`,
+    });
   } catch (error: any) {
-    console.error("Admin Sync Error:", error);
+    console.error("Sync Error:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to sync records." },
+      { success: false, message: "Failed to communicate with Google Sheets." },
       { status: 500 }
     );
   }
