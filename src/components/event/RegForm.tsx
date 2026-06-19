@@ -66,7 +66,7 @@ const BUSINESS_CATEGORIES = [
   { value: "STAGE", label: "Stage Setup / स्टेज सजावट" },
   { value: "BAND", label: "Band / बैंड" },
   { value: "MAKEUP", label: "Makeup Artist / मेकअप आर्टिस्ट" },
-  { value: "HOTEL", label: "Hotel & Banquet / होटल एवं बैंक्वेट" },
+  { value: "HOTEL", label: "Lawn/Resort & Banquet / होटल एवं बैंक्वेट" },
   { value: "TRANSPORT", label: "Transport / परिवहन" },
   { value: "OTHER", label: "Other (Please Specify) / अन्य" },
 ] as const;
@@ -272,6 +272,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
         businessName: dbData.business_name || "",
         businessCategory: dbData.business_category || "",
         otherCategory: dbData.other_category || "",
+        address: dbData.address, // <-- FIX: Added the missing address field here
         city: dbData.city,
         state: dbData.state,
         pincode: dbData.pincode,
@@ -712,7 +713,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
                       <SelectContent>
                         <SelectItem value="GENERAL">General Attendee / सामान्य</SelectItem>
                         <SelectItem value="BUSINESS">Business Owner / व्यापार</SelectItem>
-                        <SelectItem value="EXHIBITOR">Exhibitor / प्रदर्शक</SelectItem>
+                        <SelectItem value="EXHIBITOR">Exhibitor / प्रदर्शक / Supplier </SelectItem>
                         <SelectItem value="MEDIA">Media / मीडिया</SelectItem>
                       </SelectContent>
                     </Select>
