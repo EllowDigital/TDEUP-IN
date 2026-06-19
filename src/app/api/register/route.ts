@@ -130,6 +130,20 @@ export async function POST(req: Request) {
       attendanceArray = rawAttendance ? [rawAttendance] : [];
     }
 
+    // --- FIX: ALWAYS SORT ATTENDANCE DAYS IN CHRONOLOGICAL ORDER ---
+    const chronologicalOrder: Record<string, number> = {
+      "30 August": 1,
+      "31 August": 2,
+      "1 September": 3,
+    };
+
+    attendanceArray.sort((a, b) => {
+      const orderA = chronologicalOrder[a] || 99;
+      const orderB = chronologicalOrder[b] || 99;
+      return orderA - orderB;
+    });
+    // ---------------------------------------------------------------
+
     // 2. UPLOAD PHOTO TO CLOUDINARY
     let photoUrl = null;
     const photoFile = formData.get("photo") as File | null;
