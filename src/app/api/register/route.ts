@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { v2 as cloudinary } from "cloudinary";
 import { createClient } from "@supabase/supabase-js";
+import { formSchema } from "@/lib/schema";
 
 // ---------------------------------------------------------
 // Configuration & Global Settings
@@ -93,42 +94,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. ADD THIS CHECK HERE
-    const photoFile = formData.get("photo") as File | null;
-    if (!photoFile || photoFile.size === 0) {
-      return NextResponse.json(
-        { success: false, message: "Profile photo is required." },
-        { status: 400 }
-      );
-    }
-    // 1. PREPARE DATA
     const attendeeType = (formData.get("attendeeType") as string) || "GENERAL";
-    const typeInitial = attendeeType.charAt(0).toUpperCase();
-    const attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
-
-    let businessName: string | null = formData.get("businessName") as string;
-    if (!businessName || businessName.trim() === "") {
-      businessName = null;
-    }
-
-    let businessCategory: string | null = formData.get("businessCategory") as string;
-    if (!businessCategory || businessCategory.trim() === "") {
-      businessCategory = null;
-    }
-
-    // Capture otherCategory separately
-    let otherCategory: string | null = formData.get("otherCategory") as string;
-    if (businessCategory !== "OTHER" || !otherCategory || otherCategory.trim() === "") {
-      otherCategory = null;
-    }
-
-    const fullName = formData.get("fullName") as string;
-    const email = (formData.get("email") as string) || null;
-    const gender = formData.get("gender") as string;
-    const address = formData.get("address") as string;
-    const city = formData.get("city") as string;
-    const state = formData.get("state") as string;
-    const pincode = formData.get("pincode") as string;
+    const businessName = (formData.get("businessName") as string) || "";
+    const businessCategory = (formData.get("businessCategory") as string) || "";
+    const otherCategory = (formData.get("otherCategory") as string) || "";
+    const fullName = (formData.get("fullName") as string) || "";
+    const email = (formData.get("email") as string) || "";
+    const gender = (formData.get("gender") as string) || "";
+    const address = (formData.get("address") as string) || "";
+    const city = (formData.get("city") as string) || "";
+    const state = (formData.get("state") as string) || "";
+    const pincode = (formData.get("pincode") as string) || "";
 
     const rawAttendance = formData.get("attendance") as string;
     let attendanceArray: string[] = [];
@@ -136,6 +112,55 @@ export async function POST(req: Request) {
       attendanceArray = JSON.parse(rawAttendance);
     } catch {
       attendanceArray = rawAttendance ? [rawAttendance] : [];
+    }
+
+    const validationResult = formSchema.safeParse({
+      fullName,
+      mobile: mobile.trim(),
+      email,
+      gender,
+      attendeeType,
+      businessCategory,
+      otherCategory,
+      businessName,
+      address,
+      state,
+      city,
+      pincode,
+      attendance: attendanceArray,
+    });
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            validationResult.error.issues[0]?.message ||
+            "Please complete all required fields before submitting.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const photoFile = formData.get("photo") as File | null;
+    if (!photoFile || photoFile.size === 0) {
+      return NextResponse.json(
+        { success: false, message: "Profile photo is required before registration can be saved." },
+        { status: 400 }
+      );
+    }
+
+    // 1. PREPARE DATA
+    const typeInitial = attendeeType.charAt(0).toUpperCase();
+    const attendee_id = `TDE26-${typeInitial}-${generateCode(6)}`;
+
+    const normalizedBusinessName = businessName.trim() || null;
+    const normalizedBusinessCategory = businessCategory.trim() || null;
+
+    // Capture otherCategory separately
+    let normalizedOtherCategory: string | null = otherCategory.trim() || null;
+    if (normalizedBusinessCategory !== "OTHER" || !normalizedOtherCategory) {
+      normalizedOtherCategory = null;
     }
 
     // --- FIX: ALWAYS SORT ATTENDANCE DAYS IN CHRONOLOGICAL ORDER ---
@@ -159,8 +184,12 @@ export async function POST(req: Request) {
       photoUrl = await uploadToCloudinary(buffer, mobile.trim());
 
       if (!photoUrl) {
-        console.warn(
-          `Failed to upload photo for ${mobile}, continuing registration without photo.`
+        return NextResponse.json(
+          {
+            success: false,
+            message: "We could not upload your photo. Please try again with a clear image.",
+          },
+          { status: 502 }
         );
       }
     }
@@ -172,12 +201,12 @@ export async function POST(req: Request) {
         attendee_id: attendee_id,
         full_name: fullName,
         mobile: mobile.trim(),
-        email: email?.trim(),
+        email: email?.trim() || null,
         gender,
         attendee_type: attendeeType,
-        business_name: businessName,
-        business_category: businessCategory,
-        other_category: otherCategory, // <-- Added into Supabase
+        business_name: normalizedBusinessName,
+        business_category: normalizedBusinessCategory,
+        other_category: normalizedOtherCategory, // <-- Added into Supabase
         address,
         city,
         state,
@@ -214,9 +243,9 @@ export async function POST(req: Request) {
         email || "N/A",
         gender,
         attendeeType,
-        businessName || "N/A",
-        businessCategory || "N/A",
-        otherCategory || "N/A", // <-- Added otherCategory to Google Sheets
+        normalizedBusinessName || "N/A",
+        normalizedBusinessCategory || "N/A",
+        normalizedOtherCategory || "N/A", // <-- Added otherCategory to Google Sheets
         address,
         city,
         state,

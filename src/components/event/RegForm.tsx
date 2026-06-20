@@ -46,6 +46,8 @@ const MAX_PHOTO_DIMENSION = 800;
 const PHOTO_JPEG_QUALITY = 0.6;
 const SKIP_COMPRESSION_BYTES = 400 * 1024;
 const SUBMIT_TIMEOUT_MS = 30_000;
+const PHOTO_REQUIRED_MESSAGE =
+  "Profile photo is mandatory. Please upload a clear photo before submitting / प्रोफ़ाइल फोटो आवश्यक है. कृपया सबमिट करने से पहले अपलोड करें";
 
 const EVENT_DAYS = [
   { id: "30 August", title: "Day 1", date: "Aug 30" },
@@ -344,11 +346,9 @@ export function RegForm({ onSuccess }: RegFormProps) {
   );
 
   const onSubmit = async (data: FormValues) => {
-    // 1. ADD THIS CHECK HERE
     if (!compressedPhoto) {
-      setPhotoError("Profile photo is required / प्रोफ़ाइल फ़ोटो आवश्यक है");
-
-      // Optional: Scroll back to the top so the user sees the error
+      setPhotoError(PHOTO_REQUIRED_MESSAGE);
+      setSubmitError("");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -372,11 +372,11 @@ export function RegForm({ onSuccess }: RegFormProps) {
       } catch (networkError) {
         if (networkError instanceof DOMException && networkError.name === "AbortError") {
           setSubmitError(
-            "The request timed out. Please check your connection and try again / समय सीमा समाप्त, कृपया पुनः प्रयास करें।"
+            "The submission timed out before it reached the server. Please check your connection and try again / समय सीमा समाप्त हुई, कृपया पुनः प्रयास करें"
           );
         } else {
           setSubmitError(
-            "Network error. Please check your connection and try again / नेटवर्क त्रुटि, कृपया पुनः प्रयास करें।"
+            "We could not reach the server. Please check your connection and try again / सर्वर तक पहुंच नहीं सकी, कृपया पुनः प्रयास करें"
           );
         }
         return;
@@ -391,14 +391,15 @@ export function RegForm({ onSuccess }: RegFormProps) {
 
       if (!response.ok) {
         setSubmitError(
-          result.message || `Registration failed (${response.status}). Please try again.`
+          result.message ||
+            `Registration could not be saved (${response.status}). Please correct the highlighted fields and try again.`
         );
         return;
       }
 
       if (!result.attendeeId) {
         setSubmitError(
-          "Registration could not be confirmed. Please try again or contact the help desk."
+          "Registration was saved, but we could not confirm the pass number. Please try again or contact the help desk."
         );
         return;
       }
@@ -413,12 +414,12 @@ export function RegForm({ onSuccess }: RegFormProps) {
       } catch (callbackError) {
         console.error("onSuccess callback failed:", callbackError);
         setSubmitError(
-          "You're registered! We couldn't load your E-Pass screen — please refresh, your registration is saved."
+          "Your registration is saved, but the E-Pass screen could not open. Please refresh the page to view it."
         );
       }
     } catch (error) {
       console.error("Submission failed:", error);
-      setSubmitError("Something went wrong. Please try again.");
+      setSubmitError("Something went wrong while saving your registration. Please try again.");
     } finally {
       clearTimeout(timeoutId);
       isSubmittingRef.current = false;
@@ -575,9 +576,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
         )}
 
         {!hasUploadedPhoto && !photoError && (
-          <p className="mt-4 text-xs font-semibold text-slate-500">
-            Profile photo is required / प्रोफ़ाइल फ़ोटो आवश्यक है
-          </p>
+          <p className="mt-4 text-xs font-semibold text-slate-500">{PHOTO_REQUIRED_MESSAGE}</p>
         )}
       </div>
 
@@ -1082,6 +1081,8 @@ export function RegForm({ onSuccess }: RegFormProps) {
                 <>
                   <Loader2 className="w-6 h-6 animate-spin mr-2" /> Processing Photo...
                 </>
+              ) : !hasUploadedPhoto ? (
+                "Upload Photo to Continue"
               ) : (
                 "Submit & Get E-Pass"
               )}
