@@ -93,6 +93,14 @@ export async function POST(req: Request) {
       );
     }
 
+    // 1. ADD THIS CHECK HERE
+    const photoFile = formData.get("photo") as File | null;
+    if (!photoFile || photoFile.size === 0) {
+      return NextResponse.json(
+        { success: false, message: "Profile photo is required." },
+        { status: 400 }
+      );
+    }
     // 1. PREPARE DATA
     const attendeeType = (formData.get("attendeeType") as string) || "GENERAL";
     const typeInitial = attendeeType.charAt(0).toUpperCase();
@@ -146,7 +154,6 @@ export async function POST(req: Request) {
 
     // 2. UPLOAD PHOTO TO CLOUDINARY
     let photoUrl = null;
-    const photoFile = formData.get("photo") as File | null;
     if (photoFile && photoFile.size > 0) {
       const buffer = Buffer.from(await photoFile.arrayBuffer());
       photoUrl = await uploadToCloudinary(buffer, mobile.trim());

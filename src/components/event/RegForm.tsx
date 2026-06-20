@@ -344,6 +344,14 @@ export function RegForm({ onSuccess }: RegFormProps) {
   );
 
   const onSubmit = async (data: FormValues) => {
+    // 1. ADD THIS CHECK HERE
+    if (!compressedPhoto) {
+      setPhotoError("Profile photo is required / प्रोफ़ाइल फ़ोटो आवश्यक है");
+
+      // Optional: Scroll back to the top so the user sees the error
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setSubmitError("");
@@ -420,6 +428,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
   // Always true now, so the organization section is visible for GENERAL as well
   const showOrgSection = true;
   const isBusy = form.formState.isSubmitting || isProcessingPhoto || isSearching;
+  const hasUploadedPhoto = compressedPhoto !== null;
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -562,6 +571,12 @@ export function RegForm({ onSuccess }: RegFormProps) {
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             {photoError}
+          </p>
+        )}
+
+        {!hasUploadedPhoto && !photoError && (
+          <p className="mt-4 text-xs font-semibold text-slate-500">
+            Profile photo is required / प्रोफ़ाइल फ़ोटो आवश्यक है
           </p>
         )}
       </div>
@@ -1056,7 +1071,7 @@ export function RegForm({ onSuccess }: RegFormProps) {
 
             <Button
               type="submit"
-              disabled={isBusy}
+              disabled={isBusy || !hasUploadedPhoto}
               className="w-full h-16 sm:h-18 rounded-2xl bg-[#F5B415] hover:bg-[#E0A30E] text-[#0B1B2B] font-extrabold text-lg sm:text-xl shadow-[0_8px_30px_rgba(245,180,21,0.3)] hover:shadow-[0_10px_40px_rgba(245,180,21,0.4)] hover:-translate-y-1 transition-all duration-300"
             >
               {form.formState.isSubmitting ? (
