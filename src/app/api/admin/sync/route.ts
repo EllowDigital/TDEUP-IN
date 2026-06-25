@@ -60,9 +60,15 @@ export async function POST() {
 
     // 3. Sort data into Appends (new) and Updates (existing)
     unsynced.forEach((row) => {
+      // Format attendance days
       const days = Array.isArray(row.attendance_days)
         ? row.attendance_days.join(", ")
         : row.attendance_days;
+
+      // --- NEW MULTI-DAY CHECK-IN LOGIC ---
+      // Get the keys (days) from checkin_history JSON object
+      const checkinHistoryStr = Object.keys(row.checkin_history || {}).join(", ");
+      const finalCheckinStatus = checkinHistoryStr ? checkinHistoryStr : "Not Checked In";
 
       const rowData = [
         row.attendee_id,
@@ -80,7 +86,7 @@ export async function POST() {
         row.pincode,
         days,
         row.photo_url || "N/A",
-        row.checked_in ? "TRUE" : "FALSE",
+        finalCheckinStatus, // <-- UPDATED COLUMN: Will show "30 August, 31 August" or "Not Checked In"
         row.created_at,
       ];
 
@@ -99,7 +105,7 @@ export async function POST() {
 
     // 4. Execute API Calls
 
-    // A. Batch Update existing rows (e.g., updating checked_in status)
+    // A. Batch Update existing rows (e.g., updating checkin_history status)
     if (rowsToUpdate.length > 0) {
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
