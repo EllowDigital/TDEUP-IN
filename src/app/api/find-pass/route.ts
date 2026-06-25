@@ -1,45 +1,80 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Helper function to safely initialize Supabase
 function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error("Missing Supabase environment variables.");
+  }
+
+  return createClient(url, key);
 }
 
 export async function POST(req: Request) {
   try {
-    const { mobile } = await req.json();
-
-    if (!mobile) {
+    // 1. Safely parse the JSON body to prevent crashes on bad requests
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
       return NextResponse.json(
-        { success: false, message: "Mobile number required." },
+        { success: false, message: "Invalid JSON payload." },
         { status: 400 }
       );
     }
 
+    const { mobile } = body;
+
+    // 2. Strict Validation: Ensure mobile exists and is a string
+    if (!mobile || typeof mobile !== "string" || mobile.trim() === "") {
+      return NextResponse.json(
+        { success: false, message: "A valid mobile number is required." },
+        { status: 400 }
+      );
+    }
+
+    // Optional: Strip out any non-numeric characters (like spaces, dashes, or +91) 
+    // if your database only stores raw 10-digit numbers.
+    // const cleanMobile = mobile.replace(/\D/g, "").slice(-10); 
+    const cleanMobile = mobile.trim(); 
+
     const supabase = getSupabase();
 
-    // Fetch user by mobile
-    const { data, error } = await supabase
+    // 3. Fetch user by mobile
+    const { data: attendee, error } = await supabase
       .from("attendees")
-      .select("*")
-      .eq("mobile", mobile.trim())
+      .select("*") 
+      .eq("mobile", cleanMobile)
       .maybeSingle();
 
-    if (error) throw error;
+    // 4. Handle database errors gracefully
+    if (error) {
+      console.error("Supabase Error [Find Pass]:", error);
+      throw new Error("Database query failed.");
+    }
 
-    if (!data) {
+    // 5. Handle "Not Found" state
+    if (!attendee) {
       return NextResponse.json(
         { success: false, message: "No pass found for this mobile number." },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, attendee: data }, { status: 200 });
+    // 6. Return successful response
+    return NextResponse.json(
+      { success: true, attendee }, 
+      { status: 200 }
+    );
+
   } catch (error: any) {
     console.error("Find Pass Error:", error);
-    return NextResponse.json({ success: false, message: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "An unexpected server error occurred." }, 
+      { status: 500 }
+    );
   }
 }
