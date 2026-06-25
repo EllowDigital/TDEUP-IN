@@ -17,17 +17,18 @@ export async function GET() {
       .from("attendees")
       .select("*", { count: "exact", head: true });
 
-    // 2. Get pending Google Sheets sync count (UPDATED COLUMN)
+    // 2. Get pending Google Sheets sync count
     const { count: pendingCount, error: pendingError } = await supabase
       .from("attendees")
       .select("*", { count: "exact", head: true })
       .eq("needs_sheet_sync", true);
 
-    // 3. Get total checked-in count (Added for better admin visibility)
+    // 3. Get total checked-in count (NEW MULTI-DAY LOGIC)
+    // यह उन सभी यूज़र्स को गिनेगा जिनका checkin_history खाली JSON '{}' नहीं है
     const { count: checkedInCount, error: checkedInError } = await supabase
       .from("attendees")
       .select("*", { count: "exact", head: true })
-      .eq("checked_in", true);
+      .neq("checkin_history", "{}");
 
     if (totalError || pendingError || checkedInError) {
       console.error("Supabase count error:", { totalError, pendingError, checkedInError });
