@@ -21,10 +21,10 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
 
-    // Verify they exist and check if already checked in
+    // 1. Fetch user data including attendance_days and the new checkin_history
     const { data: user, error: fetchError } = await supabase
       .from("attendees")
-      .select("checked_in, full_name")
+      .select("full_name, attendance_days, checkin_history")
       .eq("attendee_id", attendee_id)
       .maybeSingle();
 
@@ -35,18 +35,44 @@ export async function POST(req: Request) {
       );
     }
 
-    if (user.checked_in) {
+    // 2. Determine "Today's Date" in Indian Standard Time (IST)
+    const dateIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const day = dateIST.getDate();
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const month = monthNames[dateIST.getMonth()];
+    
+    // Format will perfectly match your frontend array: "30 August", "31 August", "1 September"
+    const todayKey = `${day} ${month}`; 
+
+    // 3. VALIDATION: Did they register for today?
+    const attendanceDays = user.attendance_days || [];
+    if (!attendanceDays.includes(todayKey)) {
       return NextResponse.json(
-        { success: false, message: `${user.full_name} is already checked in.` },
+        { success: false, message: `Access Denied: ${user.full_name} does not have a pass for today (${todayKey}).` },
+        { status: 403 }
+      );
+    }
+
+    // 4. VALIDATION: Are they already checked in TODAY?
+    const history = user.checkin_history || {};
+    if (history[todayKey]) {
+      return NextResponse.json(
+        { success: false, message: `${user.full_name} is already checked in for today.` },
         { status: 409 }
       );
     }
 
-    // Update check-in status AND flag for Sheet Sync
+    // 5. SUCCESS: Add today's timestamp to their history
+    history[todayKey] = new Date().toISOString();
+
+    // 6. Update database with new history AND flag for Sheet Sync
     const { error: updateError } = await supabase
       .from("attendees")
       .update({
-        checked_in: true,
+        checkin_history: history,
         needs_sheet_sync: true, // <-- NEW: Tell the system this change needs to go to Google Sheets
       })
       .eq("attendee_id", attendee_id);
@@ -54,7 +80,7 @@ export async function POST(req: Request) {
     if (updateError) throw updateError;
 
     return NextResponse.json(
-      { success: true, message: `Successfully checked in ${user.full_name}!` },
+      { success: true, message: `Day ${day} Access Granted! Welcome ${user.full_name}!` },
       { status: 200 }
     );
   } catch (error: any) {
