@@ -100,17 +100,17 @@ export async function GET(req: Request) {
       attendees.forEach((row) => {
         const values = headers.map((header) => {
           let val = row[header];
-          
+
           // Format Arrays (like attendance_days)
           if (Array.isArray(val)) {
             val = val.join(", ");
-          } 
+          }
           // Format JSON Objects (like checkin_history) cleanly for CSV
           else if (val !== null && typeof val === "object") {
             const keys = Object.keys(val);
             val = keys.length > 0 ? keys.join(", ") : "Not Checked In";
           }
-          
+
           return escapeCSV(val);
         });
         csvString += values.join(",") + "\n";

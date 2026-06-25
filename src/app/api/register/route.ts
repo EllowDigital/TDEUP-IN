@@ -203,18 +203,18 @@ export async function POST(req: Request) {
         attendee_type: attendeeType,
         business_name: normalizedBusinessName,
         business_category: normalizedBusinessCategory,
-        other_category: normalizedOtherCategory, 
+        other_category: normalizedOtherCategory,
         address,
         city,
         state,
         pincode,
         attendance_days: attendanceArray,
         photo_url: photoUrl,
-        
+
         // --- NEW SCHEMA UPDATES ---
-        checkin_history: {},      // Start with empty JSON object instead of checked_in: null
-        needs_cloud_sync: false,  // It's already in the cloud!
-        needs_sheet_sync: true,   // Needs to go to Google Sheets
+        checkin_history: {}, // Start with empty JSON object instead of checked_in: null
+        needs_cloud_sync: false, // It's already in the cloud!
+        needs_sheet_sync: true, // Needs to go to Google Sheets
       },
     ]);
 
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
         attendeeType,
         normalizedBusinessName || "N/A",
         normalizedBusinessCategory || "N/A",
-        normalizedOtherCategory || "N/A", 
+        normalizedOtherCategory || "N/A",
         address,
         city,
         state,
@@ -258,13 +258,16 @@ export async function POST(req: Request) {
 
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: "Sheet1!A:Q", 
+        range: "Sheet1!A:Q",
         valueInputOption: "USER_ENTERED",
         requestBody: { values: [rowData] },
       });
 
       // 5. IF SHEETS SUCCEEDS -> UPDATE SUPABASE needs_sheet_sync TO FALSE
-      await supabase.from("attendees").update({ needs_sheet_sync: false }).eq("mobile", mobile.trim());
+      await supabase
+        .from("attendees")
+        .update({ needs_sheet_sync: false })
+        .eq("mobile", mobile.trim());
     } catch (sheetError) {
       console.error(
         `Google Sheets sync failed for ${mobile}, but data is safe in Supabase.`,

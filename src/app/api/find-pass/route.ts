@@ -36,17 +36,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Optional: Strip out any non-numeric characters (like spaces, dashes, or +91) 
+    // Optional: Strip out any non-numeric characters (like spaces, dashes, or +91)
     // if your database only stores raw 10-digit numbers.
-    // const cleanMobile = mobile.replace(/\D/g, "").slice(-10); 
-    const cleanMobile = mobile.trim(); 
+    // const cleanMobile = mobile.replace(/\D/g, "").slice(-10);
+    const cleanMobile = mobile.trim();
 
     const supabase = getSupabase();
 
     // 3. Fetch user by mobile
     const { data: attendee, error } = await supabase
       .from("attendees")
-      .select("*") 
+      .select("*")
       .eq("mobile", cleanMobile)
       .maybeSingle();
 
@@ -65,15 +65,11 @@ export async function POST(req: Request) {
     }
 
     // 6. Return successful response
-    return NextResponse.json(
-      { success: true, attendee }, 
-      { status: 200 }
-    );
-
+    return NextResponse.json({ success: true, attendee }, { status: 200 });
   } catch (error: any) {
     console.error("Find Pass Error:", error);
     return NextResponse.json(
-      { success: false, message: "An unexpected server error occurred." }, 
+      { success: false, message: "An unexpected server error occurred." },
       { status: 500 }
     );
   }

@@ -39,19 +39,32 @@ export async function POST(req: Request) {
     const dateIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const day = dateIST.getDate();
     const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     const month = monthNames[dateIST.getMonth()];
-    
+
     // Format will perfectly match your frontend array: "30 August", "31 August", "1 September"
-    const todayKey = `${day} ${month}`; 
+    const todayKey = `${day} ${month}`;
 
     // 3. VALIDATION: Did they register for today?
     const attendanceDays = user.attendance_days || [];
     if (!attendanceDays.includes(todayKey)) {
       return NextResponse.json(
-        { success: false, message: `Access Denied: ${user.full_name} does not have a pass for today (${todayKey}).` },
+        {
+          success: false,
+          message: `Access Denied: ${user.full_name} does not have a pass for today (${todayKey}).`,
+        },
         { status: 403 }
       );
     }
