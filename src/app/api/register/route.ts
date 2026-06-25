@@ -157,13 +157,12 @@ export async function POST(req: Request) {
     const normalizedBusinessName = businessName.trim() || null;
     const normalizedBusinessCategory = businessCategory.trim() || null;
 
-    // Capture otherCategory separately
     let normalizedOtherCategory: string | null = otherCategory.trim() || null;
     if (normalizedBusinessCategory !== "OTHER" || !normalizedOtherCategory) {
       normalizedOtherCategory = null;
     }
 
-    // --- FIX: ALWAYS SORT ATTENDANCE DAYS IN CHRONOLOGICAL ORDER ---
+    // ALWAYS SORT ATTENDANCE DAYS IN CHRONOLOGICAL ORDER
     const chronologicalOrder: Record<string, number> = {
       "30 August": 1,
       "31 August": 2,
@@ -175,7 +174,6 @@ export async function POST(req: Request) {
       const orderB = chronologicalOrder[b] || 99;
       return orderA - orderB;
     });
-    // ---------------------------------------------------------------
 
     // 2. UPLOAD PHOTO TO CLOUDINARY
     let photoUrl = null;
@@ -205,18 +203,18 @@ export async function POST(req: Request) {
         attendee_type: attendeeType,
         business_name: normalizedBusinessName,
         business_category: normalizedBusinessCategory,
-        other_category: normalizedOtherCategory,
+        other_category: normalizedOtherCategory, 
         address,
         city,
         state,
         pincode,
         attendance_days: attendanceArray,
         photo_url: photoUrl,
-        checked_in: null,
-
-        // --- NEW SYNC LOGIC ---
-        needs_cloud_sync: false, // क्योंकि यह डेटा पहले से क्लाउड (Supabase) में है
-        needs_sheet_sync: true, // इसे Google Sheets में जाना है
+        
+        // --- NEW SCHEMA UPDATES ---
+        checkin_history: {},      // Start with empty JSON object instead of checked_in: null
+        needs_cloud_sync: false,  // It's already in the cloud!
+        needs_sheet_sync: true,   // Needs to go to Google Sheets
       },
     ]);
 
@@ -247,33 +245,27 @@ export async function POST(req: Request) {
         attendeeType,
         normalizedBusinessName || "N/A",
         normalizedBusinessCategory || "N/A",
-        normalizedOtherCategory || "N/A", // <-- Added otherCategory to Google Sheets
+        normalizedOtherCategory || "N/A", 
         address,
         city,
         state,
         pincode,
         attendanceArray.join(", "),
         photoUrl || "N/A",
-        "FALSE", // <-- Added checked_in column default value to Google Sheets
+        "Not Checked In", // <-- Updated for clarity in Sheets
         new Date().toISOString(),
       ];
 
-      // We await this so Vercel doesn't kill the background process
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: "Sheet1!A:Q", // <-- Changed range to Q because we now have 17 columns!
+        range: "Sheet1!A:Q", 
         valueInputOption: "USER_ENTERED",
         requestBody: { values: [rowData] },
       });
 
       // 5. IF SHEETS SUCCEEDS -> UPDATE SUPABASE needs_sheet_sync TO FALSE
-      await supabase
-        .from("attendees")
-        .update({ needs_sheet_sync: false })
-        .eq("mobile", mobile.trim());
+      await supabase.from("attendees").update({ needs_sheet_sync: false }).eq("mobile", mobile.trim());
     } catch (sheetError) {
-      // IF SHEETS FAILS -> We catch the error so the app DOES NOT crash.
-      // Supabase still has needs_sync = true for this user.
       console.error(
         `Google Sheets sync failed for ${mobile}, but data is safe in Supabase.`,
         sheetError
