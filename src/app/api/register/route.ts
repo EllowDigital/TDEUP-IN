@@ -195,7 +195,6 @@ export async function POST(req: Request) {
     }
 
     // 3. ONE-SHOT SUPABASE INSERT
-    // We insert with needs_sync set to TRUE by default.
     const { error: insertError } = await supabase.from("attendees").insert([
       {
         attendee_id: attendee_id,
@@ -206,7 +205,7 @@ export async function POST(req: Request) {
         attendee_type: attendeeType,
         business_name: normalizedBusinessName,
         business_category: normalizedBusinessCategory,
-        other_category: normalizedOtherCategory, // <-- Added into Supabase
+        other_category: normalizedOtherCategory,
         address,
         city,
         state,
@@ -214,7 +213,10 @@ export async function POST(req: Request) {
         attendance_days: attendanceArray,
         photo_url: photoUrl,
         checked_in: null,
-        needs_sync: true, // Start as true
+
+        // --- NEW SYNC LOGIC ---
+        needs_cloud_sync: false, // क्योंकि यह डेटा पहले से क्लाउड (Supabase) में है
+        needs_sheet_sync: true, // इसे Google Sheets में जाना है
       },
     ]);
 
@@ -264,8 +266,11 @@ export async function POST(req: Request) {
         requestBody: { values: [rowData] },
       });
 
-      // 5. IF SHEETS SUCCEEDS -> UPDATE SUPABASE needs_sync TO FALSE
-      await supabase.from("attendees").update({ needs_sync: false }).eq("mobile", mobile.trim());
+      // 5. IF SHEETS SUCCEEDS -> UPDATE SUPABASE needs_sheet_sync TO FALSE
+      await supabase
+        .from("attendees")
+        .update({ needs_sheet_sync: false })
+        .eq("mobile", mobile.trim());
     } catch (sheetError) {
       // IF SHEETS FAILS -> We catch the error so the app DOES NOT crash.
       // Supabase still has needs_sync = true for this user.

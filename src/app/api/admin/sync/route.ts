@@ -22,12 +22,13 @@ const sheets = google.sheets({ version: "v4", auth });
 export async function POST() {
   try {
     const supabase = getSupabase();
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
     // 1. Fetch all attendees that need syncing
     const { data: unsynced, error: fetchError } = await supabase
       .from("attendees")
       .select("*")
-      .eq("needs_sync", true);
+      .eq("needs_sheet_sync", true);
 
     if (fetchError) throw fetchError;
 
@@ -38,13 +39,32 @@ export async function POST() {
       });
     }
 
-    // 2. Format the rows to exactly match your 17 Google Sheet Columns
-    const rowsToAppend = unsynced.map((row) => {
+    // 2. READ THE GOOGLE SHEET to find existing attendees
+    // We only fetch Column A (attendee_id) to map which row each person is on
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Sheet1!A:A", // Assuming Column A is attendee_id
+    });
+
+    const existingIds = sheetData.data.values || [];
+
+    // Create a map of attendee_id -> Row Number (1-indexed for Google Sheets)
+    const rowMap = new Map<string, number>();
+    existingIds.forEach((row, index) => {
+      if (row[0]) rowMap.set(row[0], index + 1);
+    });
+
+    // Arrays to hold our two different types of operations
+    const rowsToAppend: any[][] = [];
+    const rowsToUpdate: any[] = [];
+
+    // 3. Sort data into Appends (new) and Updates (existing)
+    unsynced.forEach((row) => {
       const days = Array.isArray(row.attendance_days)
         ? row.attendance_days.join(", ")
         : row.attendance_days;
 
-      return [
+      const rowData = [
         row.attendee_id,
         row.full_name,
         row.mobile,
@@ -63,29 +83,55 @@ export async function POST() {
         row.checked_in ? "TRUE" : "FALSE",
         row.created_at,
       ];
+
+      if (rowMap.has(row.attendee_id)) {
+        // Person exists! Add to update queue for their specific row
+        const rowNum = rowMap.get(row.attendee_id);
+        rowsToUpdate.push({
+          range: `Sheet1!A${rowNum}:Q${rowNum}`,
+          values: [rowData],
+        });
+      } else {
+        // Person is new! Add to append queue
+        rowsToAppend.push(rowData);
+      }
     });
 
-    // 3. Batch Append to Google Sheets
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: "Sheet1!A:Q",
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: rowsToAppend },
-    });
+    // 4. Execute API Calls
 
-    // 4. If Google Sheets succeeds, update Supabase `needs_sync` to false
+    // A. Batch Update existing rows (e.g., updating checked_in status)
+    if (rowsToUpdate.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          valueInputOption: "USER_ENTERED",
+          data: rowsToUpdate,
+        },
+      });
+    }
+
+    // B. Append new rows (e.g., offline walk-ins)
+    if (rowsToAppend.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: "Sheet1!A:Q",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: rowsToAppend },
+      });
+    }
+
+    // 5. Update Supabase `needs_sheet_sync` to false
     const syncedIds = unsynced.map((u) => u.id);
     const { error: updateError } = await supabase
       .from("attendees")
-      .update({ needs_sync: false })
+      .update({ needs_sheet_sync: false })
       .in("id", syncedIds);
 
     if (updateError) throw updateError;
 
     return NextResponse.json({
       success: true,
-      message: `Successfully synced ${unsynced.length} records to Google Sheets!`,
+      message: `Sync Complete! Updated ${rowsToUpdate.length} rows and Appended ${rowsToAppend.length} new rows.`,
     });
   } catch (error: any) {
     console.error("Sync Error:", error);

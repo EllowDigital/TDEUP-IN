@@ -42,11 +42,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update check-in status
+    // Update check-in status AND flag for Sheet Sync
     const { error: updateError } = await supabase
       .from("attendees")
-      .update({ checked_in: true }) // <-- Removed updated_at here too!
+      .update({
+        checked_in: true,
+        needs_sheet_sync: true, // <-- NEW: Tell the system this change needs to go to Google Sheets
+      })
       .eq("attendee_id", attendee_id);
+
     if (updateError) throw updateError;
 
     return NextResponse.json(
